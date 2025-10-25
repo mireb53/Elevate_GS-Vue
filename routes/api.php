@@ -31,6 +31,17 @@ use App\Http\Controllers\Api\UsersController;
     Route::get('/classes/{id}/records', [ClassesController::class, 'records']);
     Route::get('/classes/{id}/gradebook/final-grades', [ClassesController::class, 'finalGrades']);
     Route::get('/classes/{id}/gradesheet', [ClassesController::class, 'gradesheet']);
+    // Create classwork (JSON and multipart) for a class
+    Route::post('/classes/{id}/classwork', [ClassesController::class, 'createClasswork']);
+    Route::post('/classes/{id}/classwork/upload', [ClassesController::class, 'uploadClasswork']);
+
+    // Classwork helpers used by the UI (safe stubs)
+    Route::post('/classwork/{id}/link-category', [ClassesController::class, 'linkCategory']);
+    Route::post('/classwork/{id}/sync-scores', [ClassesController::class, 'syncScores']);
+    Route::get('/classwork/{id}/submissions', [ClassesController::class, 'listSubmissions']);
+    Route::get('/classwork/{id}/rubric', [ClassesController::class, 'getRubric']);
+    Route::post('/classwork/{classworkId}/submissions/{submissionId}/grade', [ClassesController::class, 'gradeSubmission']);
+    Route::post('/classwork/{classworkId}/grade', [ClassesController::class, 'gradeSubmission']);
     // Classwork item maintenance (used by Stream tab edits)
     Route::put('/classwork/{id}', [ClassesController::class, 'updateClasswork']);
     Route::delete('/classwork/{id}', [ClassesController::class, 'deleteClasswork']);

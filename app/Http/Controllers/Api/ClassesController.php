@@ -296,4 +296,129 @@ class ClassesController extends Controller
             'classProgram' => $class->program ?? ''
         ]);
     }
+
+    // POST /api/classes/{id}/classwork (JSON body)
+    public function createClasswork(Request $request, $classId)
+    {
+        if (!DB::getSchemaBuilder()->hasTable('classwork')) {
+            return response()->json(['message' => 'Classwork table not found'], 404);
+        }
+        $data = $request->validate([
+            'title' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'type' => 'required|string|max:50',
+            'dueDate' => 'nullable|string', // ISO string from UI; store into due_at
+            'quiz' => 'nullable',
+            'rubric' => 'nullable',
+        ]);
+        $payload = [
+            'class_id' => (int)$classId,
+            'title' => $data['title'],
+            'description' => $data['description'] ?? null,
+            'type' => $data['type'],
+            'due_at' => !empty($data['dueDate']) ? date('Y-m-d H:i:s', strtotime($data['dueDate'])) : null,
+            'rubric_json' => isset($data['rubric']) ? json_encode($data['rubric']) : null,
+            'extra_json' => isset($data['quiz']) ? json_encode(['quiz' => $data['quiz']]) : null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ];
+        $id = DB::table('classwork')->insertGetId($payload);
+        return response()->json(['id' => $id] + $payload, 201);
+    }
+
+    // POST /api/classes/{id}/classwork/upload (multipart form)
+    public function uploadClasswork(Request $request, $classId)
+    {
+        if (!DB::getSchemaBuilder()->hasTable('classwork')) {
+            return response()->json(['message' => 'Classwork table not found'], 404);
+        }
+        // Accept same fields as JSON create
+        $data = [
+            'title' => $request->input('title'),
+            'description' => $request->input('description'),
+            'type' => $request->input('type') ?: 'Material',
+            'dueDate' => $request->input('dueDate'),
+        ];
+        $payload = [
+            'class_id' => (int)$classId,
+            'title' => $data['title'] ?: 'Untitled',
+            'description' => $data['description'],
+            'type' => $data['type'],
+            'due_at' => !empty($data['dueDate']) ? date('Y-m-d H:i:s', strtotime($data['dueDate'])) : null,
+            'rubric_json' => $request->has('rubric') ? $request->input('rubric') : null,
+            'extra_json' => $request->has('quiz') ? json_encode(['quiz' => json_decode($request->input('quiz'), true)]) : null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ];
+        $id = DB::table('classwork')->insertGetId($payload);
+        // Attachments: for now, store filenames into extra_json.materialFiles if present
+        $files = $request->file('attachments');
+        if ($files) {
+            $names = [];
+            foreach ((array)$files as $f) {
+                try { $names[] = ['name' => $f->getClientOriginalName(), 'url' => '']; } catch (\Throwable $e) { /* ignore */ }
+            }
+            DB::table('classwork')->where('id',$id)->update(['extra_json' => json_encode(['materialFiles'=>$names])]);
+        }
+        return response()->json(['id' => $id] + $payload, 201);
+    }
+
+    // POST /api/classwork/{id}/link-category — stub ok
+    public function linkCategory(Request $request, $id)
+    {
+        return response()->json(['ok'=>true]);
+    }
+
+    // POST /api/classwork/{id}/sync-scores — stub ok
+    public function syncScores(Request $request, $id)
+    {
+        return response()->json(['ok'=>true]);
+    }
+
+    // GET /api/classwork/{id}/submissions — return empty list by default
+    public function listSubmissions(Request $request, $id)
+    {
+        if (!DB::getSchemaBuilder()->hasTable('classwork_submissions')) {
+            return response()->json([]);
+        }
+        $rows = DB::table('classwork_submissions')->where('classwork_id',$id)->orderBy('created_at','desc')->get();
+        // normalize
+        $out = [];
+        foreach ($rows as $r) {
+            $out[] = [
+                'id' => $r->id,
+                'userId' => $r->user_id,
+                'submittedAt' => $r->submitted_at ?? $r->created_at,
+                'files' => $r->files_json ? json_decode($r->files_json, true) : [],
+                'grade' => $r->grade_json ? json_decode($r->grade_json, true) : null,
+            ];
+        }
+        return response()->json($out);
+    }
+
+    // GET /api/classwork/{id}/rubric — pull from classwork.rubric_json
+    public function getRubric(Request $request, $id)
+    {
+        if (!DB::getSchemaBuilder()->hasTable('classwork')) return response()->json([]);
+        $row = DB::table('classwork')->where('id',$id)->first();
+        $rubric = $row && $row->rubric_json ? json_decode($row->rubric_json, true) : [];
+        return response()->json(['rubric'=>$rubric]);
+    }
+
+    // POST /api/classwork/{classworkId}/submissions/{submissionId}/grade (or fallback)
+    public function gradeSubmission(Request $request, $classworkId, $submissionId = null)
+    {
+        if (!DB::getSchemaBuilder()->hasTable('classwork_submissions')) {
+            // accept but no-op
+            return response()->json(['ok'=>true]);
+        }
+        $data = $request->validate(['userId'=>'nullable|integer','score'=>'required|numeric']);
+        $grade = ['score' => $data['score'], 'totalPoints' => 100, 'gradedBy'=>'teacher'];
+        if ($submissionId) {
+            DB::table('classwork_submissions')->where('id',$submissionId)->update(['grade_json'=>json_encode($grade),'updated_at'=>now()]);
+        } else if (!empty($data['userId'])) {
+            DB::table('classwork_submissions')->where(['classwork_id'=>$classworkId,'user_id'=>$data['userId']])->update(['grade_json'=>json_encode($grade),'updated_at'=>now()]);
+        }
+        return response()->json(['ok'=>true]);
+    }
 }
