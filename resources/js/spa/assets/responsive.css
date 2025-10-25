@@ -1,0 +1,666 @@
+/* ========================================
+   GRADSMART Mobile-Responsive Styles
+   Mobile-first approach with progressive enhancement
+   ======================================== */
+
+:root {
+  --gs-topbar-height: 56px;
+  --gs-mobile-padding: 12px;
+  --gs-mobile-font-size: 14px;
+  --gs-touch-target-min: 44px;
+  --gs-transition-speed: 0.2s;
+}
+
+/* ========================================
+   BASE MOBILE STYLES
+   ======================================== */
+
+/* Smooth scrolling for better UX */
+html {
+  scroll-behavior: smooth;
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+}
+
+/* Base type scale for mobile */
+body {
+  font-size: var(--gs-mobile-font-size);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden; /* Prevent horizontal scroll */
+}
+
+/* Ensure main content doesn't overflow on small screens */
+.main-content {
+  box-sizing: border-box;
+  padding: var(--gs-mobile-padding);
+}
+
+/* Container padding adjustments for mobile */
+.container, .container-fluid {
+  padding-left: var(--gs-mobile-padding);
+  padding-right: var(--gs-mobile-padding);
+}
+
+/* ========================================
+   TOPBAR MOBILE FIXES
+   ======================================== */
+
+@media (max-width: 767.98px) {
+  /* Prevent topbar from wrapping */
+  .topbar,
+  .app-layout .topbar {
+    flex-wrap: nowrap !important;
+    height: var(--gs-topbar-height) !important;
+    overflow: visible !important;
+  }
+  
+  /* Compact topbar spacing */
+  .topbar .d-flex,
+  .topbar .dropdown {
+    gap: 0.25rem;
+  }
+  
+  /* Hide non-essential text */
+  .topbar .d-none.d-sm-inline,
+  .topbar .d-none.d-md-inline {
+    display: none !important;
+  }
+}
+
+/* ========================================
+   TOUCH-FRIENDLY BUTTONS
+   ======================================== */
+
+.btn {
+  min-height: var(--gs-touch-target-min);
+  min-width: var(--gs-touch-target-min);
+  padding: 10px 16px;
+  font-size: 14px;
+  transition: all var(--gs-transition-speed) ease;
+  /* Prevent text selection on touch */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn-sm {
+  min-height: 36px;
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+.btn-icon {
+  width: var(--gs-touch-target-min);
+  height: var(--gs-touch-target-min);
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ========================================
+   TEXT & TYPOGRAPHY
+   ======================================== */
+
+.text-truncate {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Better line heights for readability */
+p, .card-text {
+  line-height: 1.6;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  line-height: 1.3;
+  word-wrap: break-word;
+}
+
+/* ========================================
+   CARDS & COURSE CARDS
+   ======================================== */
+
+.card {
+  border-radius: 12px;
+  transition: transform var(--gs-transition-speed) ease, box-shadow var(--gs-transition-speed) ease;
+}
+
+.course-card {
+  padding: 1rem;
+  cursor: pointer;
+  /* Add touch feedback */
+  -webkit-tap-highlight-color: rgba(102, 126, 234, 0.1);
+}
+
+.course-card:active {
+  transform: scale(0.98);
+}
+
+/* Avatar sizes */
+.user-avatar, .initials-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+/* ========================================
+   TABLES & DATA DISPLAY
+   ======================================== */
+
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  /* Add shadow to indicate scrollable content */
+  background:
+    linear-gradient(to right, white 30%, rgba(255,255,255,0)),
+    linear-gradient(to right, rgba(255,255,255,0), white 70%) 0 100%,
+    radial-gradient(farthest-side at 0 50%, rgba(0,0,0,.1), rgba(0,0,0,0)),
+    radial-gradient(farthest-side at 100% 50%, rgba(0,0,0,.1), rgba(0,0,0,0)) 0 100%;
+  background-repeat: no-repeat;
+  background-color: white;
+  background-size: 40px 100%, 40px 100%, 14px 100%, 14px 100%;
+  background-position: 0 0, 100%, 0 0, 100%;
+  background-attachment: local, local, scroll, scroll;
+}
+
+.table {
+  font-size: 13px;
+}
+
+.table th, .table td {
+  padding: 8px;
+  vertical-align: middle;
+}
+
+/* ========================================
+   FORMS & INPUTS
+   ======================================== */
+
+.form-control, .form-select {
+  font-size: 16px; /* Prevents zoom on iOS */
+  min-height: var(--gs-touch-target-min);
+  padding: 10px 12px;
+  border-radius: 8px;
+}
+
+.form-control:focus, .form-select:focus {
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
+  border-color: #667eea;
+}
+
+.input-group-text {
+  min-height: var(--gs-touch-target-min);
+  padding: 10px 12px;
+}
+
+/* ========================================
+   MODALS & DROPDOWNS
+   ======================================== */
+
+.dropdown-menu {
+  max-width: 90vw;
+  font-size: 14px;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.dropdown-item {
+  padding: 10px 16px;
+  min-height: var(--gs-touch-target-min);
+  display: flex;
+  align-items: center;
+}
+
+.modal-content {
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.modal-header {
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
+  padding: 16px 20px;
+}
+
+.modal-body {
+  padding: 20px;
+}
+
+.modal-footer {
+  border-bottom-left-radius: 16px;
+  border-bottom-right-radius: 16px;
+  padding: 16px 20px;
+}
+
+/* ========================================
+   NAVIGATION & TABS
+   ======================================== */
+
+.nav-tabs .nav-link {
+  padding: 12px 16px;
+  font-size: 14px;
+  border-radius: 8px 8px 0 0;
+  transition: all var(--gs-transition-speed) ease;
+}
+
+.nav-pills .nav-link {
+  padding: 10px 16px;
+  border-radius: 8px;
+  min-height: var(--gs-touch-target-min);
+}
+
+/* ========================================
+   BADGES & ALERTS
+   ======================================== */
+
+.badge {
+  padding: 6px 12px;
+  font-size: 12px;
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+.alert {
+  border-radius: 12px;
+  padding: 12px 16px;
+}
+
+/* ========================================
+   MOBILE BREAKPOINTS (max-width: 575.98px)
+   Extra small devices (phones, less than 576px)
+   ======================================== */
+
+@media (max-width: 575.98px) {
+  /* Typography adjustments */
+  h1 { font-size: 1.75rem; }
+  h2 { font-size: 1.5rem; }
+  h3 { font-size: 1.25rem; }
+  h4 { font-size: 1.1rem; }
+  h5 { font-size: 1rem; }
+  h6 { font-size: 0.9rem; }
+
+  /* Container and spacing */
+  .container {
+    max-width: 100%;
+    padding: 0 12px;
+  }
+
+  .py-3 { padding-top: 1rem !important; padding-bottom: 1rem !important; }
+  .py-4 { padding-top: 1.5rem !important; padding-bottom: 1.5rem !important; }
+  .mb-3, .my-3 { margin-bottom: 1rem !important; }
+  .mb-4, .my-4 { margin-bottom: 1.5rem !important; }
+
+  /* Buttons - Stack vertically with spacing */
+  .d-flex.gap-2 {
+    flex-direction: column;
+    gap: 0.5rem !important;
+  }
+
+  .btn-group-mobile {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .btn-group-mobile .btn {
+    width: 100%;
+    margin-bottom: 0.5rem;
+  }
+
+  /* Button text adjustments */
+  .btn .me-1, .btn .me-2 {
+    margin-right: 0.25rem !important;
+  }
+
+  .btn-sm {
+    font-size: 12px;
+    padding: 6px 10px;
+  }
+
+  /* Hide button text, show icon only on very small screens */
+  .btn-mobile-icon-only .btn-text {
+    display: none;
+  }
+
+  /* Modals - Full screen on mobile */
+  .modal-dialog {
+    max-width: 100%;
+    margin: 0;
+    min-height: 100vh;
+  }
+
+  .modal-content {
+    border-radius: 0;
+    min-height: 100vh;
+    border: none;
+  }
+
+  .modal-fullscreen-mobile {
+    max-width: 100%;
+    margin: 0;
+  }
+
+  /* FABs and floating elements */
+  .fab-record {
+    display: none !important;
+  }
+
+  /* Cards - Full width */
+  .course-card {
+    width: 100% !important;
+    margin-bottom: 1rem;
+  }
+
+  .card {
+    margin-bottom: 1rem;
+  }
+
+  /* Course grid - Single column */
+  .courses-container .row > [class*='col-'] {
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+
+  /* Dashboard welcome section */
+  .welcome-container {
+    padding: 1.5rem 1rem;
+    text-align: center;
+  }
+
+  #mainWelcomeTitle {
+    font-size: 2rem;
+  }
+
+  /* Calendar overview - Stack vertically */
+  .calendar-overview .card {
+    margin-bottom: 1rem;
+  }
+
+  /* Navigation */
+  .nav .nav-link {
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+
+  .nav-tabs {
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .nav-tabs .nav-item {
+    flex-shrink: 0;
+  }
+
+  /* Table responsive improvements */
+  .table {
+    font-size: 12px;
+  }
+
+  .table th, .table td {
+    padding: 6px 4px;
+    white-space: nowrap;
+  }
+
+  /* Sticky headers for better scrolling */
+  .table thead th {
+    position: sticky;
+    top: 0;
+    background: white;
+    z-index: 10;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+
+  /* Search and filters - Stack vertically */
+  .d-flex.justify-content-between {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .input-group {
+    max-width: 100% !important;
+  }
+
+  /* Dropdown menus - Full width */
+  .dropdown-menu-mobile {
+    position: absolute;
+    top: calc(var(--gs-topbar-height) + 6px);
+    right: 8px;
+    left: 8px;
+    min-width: auto;
+    z-index: 1110;
+  }
+
+  /* Badges in headers - Wrap to new line */
+  h3 small, h4 small, h5 small {
+    display: block;
+    margin-top: 0.5rem;
+  }
+
+  /* Alerts - More compact */
+  .alert {
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+
+  /* Form groups - Stack vertically */
+  .form-row {
+    flex-direction: column;
+  }
+
+  .form-row > div {
+    width: 100% !important;
+    margin-bottom: 1rem;
+  }
+}
+
+/* ========================================
+   SMALL DEVICES (max-width: 767.98px)
+   Tablets in portrait, less than 768px
+   ======================================== */
+
+@media (max-width: 767.98px) {
+  /* Sidebar adjustments */
+  .sidebar {
+    width: 260px;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+  }
+
+  .sidebar.show {
+    transform: translateX(0);
+  }
+
+  .sidebar .course-link {
+    max-width: 200px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Main content - Full width when sidebar hidden */
+  .main-content {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  /* Header - Stack elements */
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start !important;
+  }
+
+  .page-header > div {
+    width: 100%;
+    margin-bottom: 1rem;
+  }
+}
+
+/* ========================================
+   MEDIUM DEVICES (max-width: 991.98px)
+   Tablets, less than 992px
+   ======================================== */
+
+@media (max-width: 991.98px) {
+  .sidebar {
+    width: 240px;
+  }
+
+  /* Adjust grid for medium screens */
+  .col-lg-4, .col-lg-3 {
+    flex: 0 0 50%;
+    max-width: 50%;
+  }
+}
+
+/* ========================================
+   LANDSCAPE MODE (max-height: 500px)
+   Mobile landscape optimization
+   ======================================== */
+
+@media (max-height: 500px) and (orientation: landscape) {
+  /* Reduce vertical padding */
+  .py-3, .py-4 {
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+  }
+
+  .mb-3, .mb-4 {
+    margin-bottom: 0.5rem !important;
+  }
+
+  /* Compact header */
+  h1, h2, h3 {
+    margin-bottom: 0.5rem;
+  }
+
+  /* Scroll modals instead of full height */
+  .modal-dialog {
+    max-height: 100vh;
+    overflow-y: auto;
+  }
+}
+
+/* ========================================
+   TOUCH DEVICE OPTIMIZATIONS
+   ======================================== */
+
+@media (pointer: coarse) {
+  /* Larger touch targets */
+  a, button, .clickable {
+    min-width: var(--gs-touch-target-min);
+    min-height: var(--gs-touch-target-min);
+  }
+
+  /* Remove hover effects on touch devices */
+  .card:hover {
+    transform: none;
+  }
+
+  /* Scrollbar styling for touch */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05);
+  }
+}
+
+/* ========================================
+   VERY SMALL SCREENS (max-width: 420px)
+   Very small phones
+   ======================================== */
+
+@media (max-width: 420px) {
+  /* Ultra compact spacing */
+  .container {
+    padding: 0 8px;
+  }
+
+  .btn {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  .card {
+    padding: 0.75rem;
+  }
+
+  /* Hide less important elements */
+  .hide-xs {
+    display: none !important;
+  }
+
+  /* Truncate long text */
+  .course-name, .card-title {
+    font-size: 1rem;
+    line-height: 1.3;
+  }
+}
+
+/* ========================================
+   UTILITY CLASSES
+   ======================================== */
+
+/* Mobile-specific utilities */
+.mobile-only {
+  display: none;
+}
+
+@media (max-width: 767.98px) {
+  .mobile-only {
+    display: block;
+  }
+
+  .desktop-only {
+    display: none !important;
+  }
+}
+
+/* Spacing utilities */
+.mobile-p-0 { padding: 0 !important; }
+.mobile-m-0 { margin: 0 !important; }
+.mobile-w-100 { width: 100% !important; }
+
+@media (max-width: 575.98px) {
+  .mobile-p-0 { padding: 0 !important; }
+  .mobile-m-0 { margin: 0 !important; }
+  .mobile-w-100 { width: 100% !important; }
+}
+
+/* Hide dev overlays on mobile */
+#__vconsole, .vconsole, .vite-error-overlay, .devtools-overlay {
+  display: none !important;
+  pointer-events: none !important;
+}
+
+/* ========================================
+   PRINT STYLES
+   ======================================== */
+
+@media print {
+  .no-print, .sidebar, .topbar, .fab-record, .modal-backdrop {
+    display: none !important;
+  }
+
+  .main-content {
+    width: 100% !important;
+    margin: 0 !important;
+  }
+
+  .card {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}

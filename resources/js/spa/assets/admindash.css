@@ -1,0 +1,16 @@
+/* Placeholder admin dashboard styles (ported from vue-project). */
+/* If you have the original file, replace this with the exact content. */
+
+.dashboard-header { text-align:center; margin: 1rem 0 1.25rem; }
+.dashboard-header h1 { font-weight: 800; letter-spacing: .5px; }
+.dashboard-header h1 span { color: #ab1818; }
+.dashboard-body { padding-bottom: 1rem; }
+
+.course-monitoring .card-header { background: #fff; }
+.course-monitoring .table thead th { font-weight: 600; }
+
+/* small layout tweaks */
+@media (max-width: 576px) {
+  .dashboard-header h1 { font-size: 1.75rem; }
+  .dashboard-header small { display:block; margin-bottom:.25rem; }
+}
