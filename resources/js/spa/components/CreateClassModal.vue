@@ -32,10 +32,7 @@
               <div class="form-text">This is automatically set by the administrator</div>
             </div>
 
-            <div class="mb-3">
-              <label class="form-label" for="schoolYear">School Year <span class="text-muted small">(auto-set)</span></label>
-              <input type="text" class="form-control bg-light" id="schoolYear" v-model="schoolYear" readonly required>
-            </div>
+            <!-- School Year field removed as requested -->
             <div class="mb-3">
               <label class="form-label" for="section">Section</label>
               <input type="text" class="form-control" id="section" v-model="section" required placeholder="Enter section (e.g. A, B, 1)">
@@ -117,7 +114,7 @@ import { API_BASE } from '../services/apiBase'
 
 const academicYear = ref('')
 const loadingAcademicYear = ref(false)
-const schoolYear = ref('')
+// School Year field removed
 const program = ref('')
 const courseType = ref('')
 const basicCourse = ref('')
@@ -427,11 +424,6 @@ async function fetchActiveAcademicYear() {
 onMounted(() => {
   // Fetch active academic year
   fetchActiveAcademicYear()
-  
-  // Auto-set school year (e.g., 2025-2026)
-  const now = new Date()
-  const year = now.getFullYear()
-  schoolYear.value = `${year}-${year + 1}`
   // Generate a random class code (could be improved)
   classCode.value = Math.random().toString(36).substring(2, 8).toUpperCase()
 })
@@ -476,6 +468,8 @@ async function submitCreateClass() {
     selectedCourse = thesisCourse.value
   }
   try {
+    // Derive subject_code from the selected course label (text before the first '–')
+    const subjectCode = (selectedCourse || '').split('–')[0].trim()
     const res = await fetch(`${API_BASE}/api/classes`, {
       method: 'POST',
       credentials: 'include',
@@ -486,10 +480,11 @@ async function submitCreateClass() {
         classCode: classCode.value,
         program: program.value,
         courseType: courseType.value,
-        schoolYear: schoolYear.value,
+        // schoolYear removed
         academicYear: academicYear.value,
         description: '',
-        courseName: selectedCourse
+        courseName: selectedCourse,
+        subject_code: subjectCode
       })
     })
     const data = await res.json()

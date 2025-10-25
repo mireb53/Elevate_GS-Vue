@@ -33,7 +33,7 @@
         <div class="or-separator">OR</div>
 
         <div id="g_id_onload"
-             data-client_id="651352432780-btgq6d60dl2ga4suk5kn0hce9hhnu9ej.apps.googleusercontent.com"
+             :data-client_id="googleClientId"
              data-context="signin"
              data-ux_mode="popup"
              data-callback="handleGoogleCredentialResponse">
@@ -64,6 +64,9 @@ import { useRouter } from 'vue-router';
 const router = useRouter();
 import { API_BASE } from '../services/apiBase';
 const BACKEND_API_BASE_URL = API_BASE;
+
+// Google Client ID from environment variable
+const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '651352432780-btgq6d60dl2ga4suk5kn0hce9hhnu9ej.apps.googleusercontent.com';
 
 // Message handling
 const message = ref('');

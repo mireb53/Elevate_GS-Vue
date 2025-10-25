@@ -24,6 +24,16 @@ use App\Http\Controllers\Api\UsersController;
     // Classes
     Route::get('/classes', [ClassesController::class, 'myClasses']);
     Route::post('/classes', [ClassesController::class, 'create']);
+    // Teacher course view expects the following read endpoints
+    Route::get('/classes/{id}', [ClassesController::class, 'show']);
+    Route::get('/classes/{id}/classwork', [ClassesController::class, 'classwork']);
+    Route::get('/classes/{id}/people', [ClassesController::class, 'people']);
+    Route::get('/classes/{id}/records', [ClassesController::class, 'records']);
+    Route::get('/classes/{id}/gradebook/final-grades', [ClassesController::class, 'finalGrades']);
+    Route::get('/classes/{id}/gradesheet', [ClassesController::class, 'gradesheet']);
+    // Classwork item maintenance (used by Stream tab edits)
+    Route::put('/classwork/{id}', [ClassesController::class, 'updateClasswork']);
+    Route::delete('/classwork/{id}', [ClassesController::class, 'deleteClasswork']);
 
     // Joined classes
     Route::get('/joined-classes', [JoinedClassesController::class, 'index']);

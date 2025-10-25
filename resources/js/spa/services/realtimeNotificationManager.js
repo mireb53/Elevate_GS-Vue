@@ -3,6 +3,8 @@
  * Handles Server-Sent Events (SSE) connection for live notifications
  */
 
+import { API_BASE } from './apiBase'
+
 class RealtimeNotificationManager {
   constructor() {
     this.eventSource = null;
@@ -12,7 +14,8 @@ class RealtimeNotificationManager {
     this.maxReconnectAttempts = 5;
     this.reconnectDelay = 2000; // Start with 2 seconds
     this.connectTime = null; // Track when connection was established
-    this.API_BASE = window.BACKEND_API_BASE_URL || 'http://localhost:3000';
+    // Use centralized API base resolver; falls back to location origin via apiBase.js
+    this.API_BASE = API_BASE;
   }
 
   /**

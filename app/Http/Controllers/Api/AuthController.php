@@ -178,4 +178,87 @@ class AuthController extends Controller
             'firstName' => $user->first_name ?? ($user->name ?? null),
         ]);
     }
+
+    public function googleLogin(Request $request)
+    {
+        $validated = $request->validate([
+            'token' => 'required|string'
+        ]);
+
+        try {
+            // Verify the Google ID token
+            $client = new \Google_Client(['client_id' => env('GOOGLE_CLIENT_ID')]);
+            $payload = $client->verifyIdToken($validated['token']);
+            
+            if (!$payload) {
+                return response()->json(['message' => 'Invalid Google token'], 401);
+            }
+
+            $googleId = $payload['sub'];
+            $email = $payload['email'];
+            $name = $payload['name'] ?? '';
+            $picture = $payload['picture'] ?? null;
+
+            // Split name into first and last
+            $nameParts = preg_split('/\s+/', trim($name), -1, PREG_SPLIT_NO_EMPTY);
+            $firstName = $nameParts[0] ?? $name;
+            $lastName = count($nameParts) > 1 ? implode(' ', array_slice($nameParts, 1)) : '';
+
+            // Find or create user
+            $user = DB::table('users')->where('email', $email)->first();
+            
+            if (!$user) {
+                // Check if google_id column exists
+                $columns = collect(DB::select("SHOW COLUMNS FROM users"))->pluck('Field')->all();
+                
+                $insertData = [
+                    'email' => $email,
+                    'first_name' => $firstName,
+                    'last_name' => $lastName,
+                    'name' => $name ?: $firstName,
+                    'role' => 'student',
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+
+                if (in_array('google_id', $columns)) {
+                    $insertData['google_id'] = $googleId;
+                }
+                if (in_array('google_picture', $columns)) {
+                    $insertData['google_picture'] = $picture;
+                }
+                
+                $userId = DB::table('users')->insertGetId($insertData);
+                $user = DB::table('users')->where('id', $userId)->first();
+            } else {
+                // Update google_id and picture if columns exist
+                $columns = collect(DB::select("SHOW COLUMNS FROM users"))->pluck('Field')->all();
+                $updateData = [];
+                
+                if (in_array('google_id', $columns) && empty($user->google_id)) {
+                    $updateData['google_id'] = $googleId;
+                }
+                if (in_array('google_picture', $columns)) {
+                    $updateData['google_picture'] = $picture;
+                }
+                
+                if (!empty($updateData)) {
+                    DB::table('users')->where('id', $user->id)->update($updateData);
+                    $user = DB::table('users')->where('id', $user->id)->first();
+                }
+            }
+
+            return response()->json([
+                'message' => 'Login successful',
+                'userId' => $user->id,
+                'role' => $user->role ?? 'student',
+                'firstName' => $user->first_name ?? ($user->name ?? null),
+                'google_picture' => $user->google_picture ?? null,
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Google login error: ' . $e->getMessage());
+            return response()->json(['message' => 'Google login failed: ' . $e->getMessage()], 500);
+        }
+    }
 }

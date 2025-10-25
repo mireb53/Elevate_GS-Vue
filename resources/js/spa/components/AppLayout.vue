@@ -112,25 +112,34 @@
             <li class="nav-item" id="myCoursesNavItem">
               <a class="nav-link d-flex align-items-center" data-bs-toggle="collapse" :href="`#myCoursesCollapse`" aria-expanded="false" :class="{ 'disabled': userRole !== 'teacher' }">
                 <i class="bi bi-journal-text me-2"></i>
-                <span class="link-text flex-grow-1">My Courses</span>
-                <i class="bi bi-caret-down-fill caret flex-shrink-0"></i>
+                <span class="link-text grow">My Courses</span>
+                <i class="bi bi-caret-down-fill caret shrink-0"></i>
               </a>
-              <div class="collapse" :id="`myCoursesCollapse`">
+              <div class="collapse" :id="`myCoursesCollapse`" v-show="sidebarReady">
                 <ul class="nav flex-column ms-2 mt-1" id="sidebarMyCoursesList">
                   <li v-if="userRole !== 'teacher'" class="nav-item">
                     <span class="nav-link text-muted" style="font-size: 0.85rem;">Teacher only</span>
                   </li>
-                  <li v-else-if="createdCourses.length === 0" class="nav-item">
+                  <li v-else-if="displayedCreatedCourses.length === 0" class="nav-item">
                     <span class="nav-link text-muted">No courses created.</span>
                   </li>
-                  <li v-else v-for="course in createdCourses" :key="course.class_id" class="nav-item">
-                    <router-link
-                      :to="{ name: 'TeacherCourse', params: { courseId: course.class_id } }"
-                      class="nav-link course-link"
-                      :title="course.class_name"
-                    >
-                      {{ course.class_name }}
-                    </router-link>
+                  <li v-else v-for="course in displayedCreatedCourses" :key="course.class_id" class="nav-item">
+                    <template v-if="(course.status || '').toLowerCase() === 'active'">
+                      <router-link
+                        :to="{ name: 'TeacherCourse', params: { courseId: course.class_id } }"
+                        class="nav-link course-link"
+                        :title="course.class_name"
+                        style="background: #f3f4f6; color: #111827; border-radius: 6px; margin-bottom: 2px;"
+                      >
+                        {{ course.class_name }}
+                      </router-link>
+                    </template>
+                    <template v-else>
+                      <span class="nav-link course-link text-muted" :title="course.class_name + ' (Pending approval)'" style="background: #fffbe6; color: #ab1818; border-radius: 6px; margin-bottom: 2px;">
+                        {{ course.class_name }}
+                        <span class="badge bg-warning text-dark ms-2">Pending</span>
+                      </span>
+                    </template>
                   </li>
                 </ul>
               </div>
@@ -140,23 +149,31 @@
             <li class="nav-item">
               <a class="nav-link d-flex align-items-center" data-bs-toggle="collapse" :href="`#joinedCoursesCollapse`" aria-expanded="false">
                 <i class="bi bi-journal-bookmark-fill me-2"></i>
-                <span class="link-text flex-grow-1">Joined Courses</span>
-                <i class="bi bi-caret-down-fill caret flex-shrink-0"></i>
+                <span class="link-text grow">Joined Courses</span>
+                <i class="bi bi-caret-down-fill caret shrink-0"></i>
               </a>
-              <div class="collapse" :id="`joinedCoursesCollapse`">
+              <div class="collapse" :id="`joinedCoursesCollapse`" v-show="sidebarReady">
                 <ul class="nav flex-column ms-2 mt-1" id="sidebarJoinedCoursesList">
-                  <li v-if="joinedCourses.length === 0" class="nav-item">
+                  <li v-if="displayedJoinedCourses.length === 0" class="nav-item">
                     <span class="nav-link text-muted">No joined courses.</span>
                   </li>
-                  <li v-else v-for="course in joinedCourses" :key="course.class_id" class="nav-item">
-                    <router-link
-                      :to="{ name: 'StudentCourse', params: { courseId: course.class_id } }"
-                      class="nav-link course-link"
-                      :title="course.class_name"
-                      @click.prevent="navigate(`/courses/${course.class_id}`)"
-                    >
-                      {{ course.class_name }}
-                    </router-link>
+                  <li v-else v-for="course in displayedJoinedCourses" :key="course.class_id" class="nav-item">
+                    <template v-if="(course.status || '').toLowerCase() === 'active'">
+                      <router-link
+                        :to="{ name: 'StudentCourse', params: { courseId: course.class_id } }"
+                        class="nav-link course-link"
+                        :title="course.class_name"
+                        style="background: #e6f7ff; color: #111827; border-radius: 6px; margin-bottom: 2px;"
+                      >
+                        {{ course.class_name }}
+                      </router-link>
+                    </template>
+                    <template v-else>
+                      <span class="nav-link course-link text-muted" :title="course.class_name + ' (Not active)'" style="background: #f8f9fa; color: #6c757d; border-radius: 6px; margin-bottom: 2px;">
+                        {{ course.class_name }}
+                        <span class="badge bg-secondary ms-2">Inactive</span>
+                      </span>
+                    </template>
                   </li>
                 </ul>
               </div>
@@ -226,6 +243,21 @@ const userRole = computed(() => localStorage.getItem('loggedInUserRole') || 'stu
 const profilePicture = ref('')
 const createdCourses = ref([])
 const joinedCourses = ref([])
+const sidebarReady = ref(false)
+const displayedCreatedCourses = computed(() => {
+  // Teachers see all created; keep pending visible but styled disabled
+  if (userRole.value !== 'teacher') return []
+  // Only show courses that are not archived
+  return (Array.isArray(createdCourses.value) ? createdCourses.value : []).filter(c => (c.status || '').toLowerCase() !== 'archived')
+})
+const displayedJoinedCourses = computed(() => {
+  // Only show joined classes whose class status is active and not archived
+  const all = Array.isArray(joinedCourses.value) ? joinedCourses.value : []
+  return all.filter(c => {
+    const status = (c.status || '').toLowerCase()
+    return status === 'active'
+  })
+})
 
 // Computed properties
 const initials = computed(() => {
@@ -326,6 +358,7 @@ async function loadCourses() {
       const createdRes = await fetch(`${BACKEND_API_BASE_URL}/api/classes?userId=${userId.value}`)
       if (createdRes.ok) {
         createdCourses.value = await createdRes.json()
+        console.debug('[Sidebar] loaded createdCourses', createdCourses.value.length, createdCourses.value)
       }
     }
 
@@ -333,6 +366,7 @@ async function loadCourses() {
     const joinedRes = await fetch(`${BACKEND_API_BASE_URL}/api/joined-classes?userId=${userId.value}`)
     if (joinedRes.ok) {
       joinedCourses.value = await joinedRes.json()
+      console.debug('[Sidebar] loaded joinedCourses', joinedCourses.value.length, joinedCourses.value)
     }
   } catch (err) {
     console.error('Error loading courses:', err)
@@ -364,12 +398,11 @@ onMounted(async () => {
     return
   }
 
-  await Promise.all([
-    loadUserProfile(),
-    loadCourses()
-  ])
+  // Load profile and courses, then update sidebar
+  await loadUserProfile()
+  await loadCourses()
 
-  // Initialize Bootstrap collapse for course sections
+  // Initialize Bootstrap collapse for course sections and auto-expand if they have content
   await nextTick(() => {
     if (window.bootstrap && window.bootstrap.Collapse) {
       // Initialize collapse elements
@@ -377,12 +410,22 @@ onMounted(async () => {
       const joinedCoursesCollapse = document.getElementById('joinedCoursesCollapse')
 
       if (myCoursesCollapse) {
-        new window.bootstrap.Collapse(myCoursesCollapse, { toggle: false })
+        const myInst = new window.bootstrap.Collapse(myCoursesCollapse, { toggle: false })
+        // Auto-expand if there are created courses
+        if (displayedCreatedCourses.value.length > 0) {
+          myInst.show()
+        }
       }
       if (joinedCoursesCollapse) {
-        new window.bootstrap.Collapse(joinedCoursesCollapse, { toggle: false })
+        const joinedInst = new window.bootstrap.Collapse(joinedCoursesCollapse, { toggle: false })
+        // Auto-expand if there are joined courses
+        if (displayedJoinedCourses.value.length > 0) {
+          joinedInst.show()
+        }
       }
     }
+    // Mark sidebar ready so UI can render without flashing
+    sidebarReady.value = true
   })
 })
 
@@ -849,5 +892,23 @@ if (typeof window !== 'undefined') {
   .sidebar {
     transform: translateX(0) !important;
   }
+}
+
+/* Sidebar course link fixes: ensure visibility even if global styles change */
+.sidebar .nav-link.course-link {
+  display: block !important;
+  padding: 8px 10px !important;
+  border-radius: 6px !important;
+  margin-bottom: 4px !important;
+  color: #111827 !important;
+  background: transparent !important;
+}
+.sidebar .nav-link.course-link .badge {
+  vertical-align: middle;
+}
+
+/* Force nav-link color inside sidebar */
+.sidebar .nav-link {
+  color: #374151 !important;
 }
 </style>

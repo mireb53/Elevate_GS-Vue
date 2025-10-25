@@ -66,7 +66,7 @@ class DebugController extends Controller
         ]);
     }
 
-    public function adminNotifications(Request $request)
+ public function adminNotifications(Request $request)
     {
         return response()->json([
             'pendingCoursesCount' => 0,
@@ -78,12 +78,76 @@ class DebugController extends Controller
     {
         $page = max(1, (int) $request->query('page', 1));
         $pageSize = max(1, min(50, (int) $request->query('pageSize', 10)));
+        $status = strtolower((string) $request->query('status', 'all'));
+        $search = trim((string) $request->query('search', ''));
+
+        $qb = DB::table('classes as c')
+            ->leftJoin('users as u', 'u.id', '=', 'c.user_id')
+            ->select(
+                'c.class_id', 'c.class_name', 'c.program', 'c.section', 'c.subject_code', 'c.course_name', 'c.status', 'c.created_at',
+                DB::raw("COALESCE(u.name, CONCAT(COALESCE(u.first_name, ''),' ',COALESCE(u.last_name, ''))) as teacher_display")
+            );
+        if (in_array($status, ['active','pending','archived'])) {
+            $qb->where('c.status', $status);
+        }
+        if ($search !== '') {
+            $qb->where(function($q) use ($search){
+                $q->where('c.class_name', 'like', "%$search%")
+                  ->orWhere('c.program', 'like', "%$search%")
+                  ->orWhere('c.subject_code', 'like', "%$search%");
+            });
+        }
+
+        $total = (clone $qb)->count();
+        $rows = $qb->orderBy('c.created_at','desc')->offset(($page-1)*$pageSize)->limit($pageSize)->get();
+
+        $active = DB::table('classes')->where('status','active')->count();
+        $pending = DB::table('classes')->where('status','pending')->count();
+        $archived = DB::table('classes')->where('status','archived')->count();
+
+        $data = $rows->map(function($r){
+            return [
+                'id' => $r->class_id,
+                'name' => $r->class_name,
+                'class_name' => $r->class_name,
+                'teacher' => $r->teacher_display,
+                'teacher_display' => $r->teacher_display,
+                'studentCount' => 0,
+                'createdAt' => $r->created_at,
+                'status' => $r->status,
+            ];
+        });
+
         return response()->json([
-            'items' => [],
-            'total' => 0,
-            'page' => $page,
-            'pageSize' => $pageSize,
-            'counts' => [ 'all' => 0, 'active' => 0, 'pending' => 0, 'archived' => 0 ],
+            'data' => $data,
+            'meta' => [
+                'total' => $total,
+                'page' => $page,
+                'pageSize' => $pageSize,
+                'active' => $active,
+                'pending' => $pending,
+                'archived' => $archived,
+            ]
         ]);
+    }
+
+    public function adminCoursesUpdate(Request $request, $id)
+    {
+        $status = strtolower((string) $request->input('status'));
+        if (!in_array($status, ['active','archived','pending'])) {
+            return response()->json(['message' => 'Invalid status'], 422);
+        }
+        $exists = DB::table('classes')->where('class_id', $id)->exists();
+        if (!$exists) return response()->json(['message' => 'Not found'], 404);
+        DB::table('classes')->where('class_id', $id)->update(['status' => $status, 'updated_at' => now()]);
+        return response()->json(['ok' => true]);
+    }
+
+    public function adminCoursesDestroy(Request $request, $id)
+    {
+        DB::table('class_instructors')->where('class_id', $id)->delete();
+        $deleted = DB::table('classes')->where('class_id', $id)->delete();
+        if (!$deleted) return response()->json(['message' => 'Not found'], 404);
+        return response()->json(['ok' => true]);
     }
 }

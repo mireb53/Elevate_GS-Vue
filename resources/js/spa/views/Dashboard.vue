@@ -207,8 +207,7 @@ async function leaveCourse(course) {
       headers: {
         'Content-Type': 'application/json',
         'x-user-id': userId.value
-      },
-      credentials: 'include'
+      }
     })
     
     const result = await response.json()
@@ -231,7 +230,6 @@ async function loadCalendarEvents() {
     loading.value = true
     const headers = userId.value ? { 'x-user-id': userId.value } : {}
   const res = await fetch(`${API_BASE}/api/calendar`, { 
-      credentials: 'include',
       headers 
     })
     

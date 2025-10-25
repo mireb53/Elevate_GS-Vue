@@ -155,32 +155,54 @@ router.beforeEach((to, from, next) => {
   const loggedIn = hasSession || (rawId && rawId !== 'null' && rawId !== 'undefined');
   const userRole = (localStorage.getItem('loggedInUserRole') || 'student');
 
-  // If trying to access a public page while logged in
+  console.log('[Router] Navigation:', {
+    to: to.path,
+    from: from.path,
+    isPublic,
+    loggedIn,
+    userRole,
+    rawId,
+    hasSession
+  });
+
+  // Allow navigation to public pages when not logged in
+  if (isPublic && !loggedIn) {
+    console.log('[Router] Public page, not logged in → Allow');
+    return next();
+  }
+
+  // If trying to access a public page while logged in → redirect to dashboard
   if (loggedIn && isPublic) {
+    console.log('[Router] Already logged in, redirecting to dashboard');
     return next(userRole === 'teacher' ? '/teacher/dashboard' : '/dashboard');
   }
 
-  // If page requires auth and user isn't logged in -> redirect to landing page
+  // If page requires auth and user isn't logged in → redirect to landing page
   if (!isPublic && !loggedIn) {
+    console.log('[Router] Not logged in, redirecting to landing');
     return next('/');
   }
 
   // Handle teacher routes
   if (to.meta.requiresTeacher && userRole !== 'teacher') {
+    console.log('[Router] Teacher route but not teacher, redirecting');
     return next('/dashboard');
   }
 
   // Handle admin routes
   if (to.meta.requiresAdmin && userRole !== 'admin') {
+    console.log('[Router] Admin route but not admin, redirecting');
     return next('/dashboard');
   }
 
   // Handle student routes
   if (to.meta.requiresStudent && userRole !== 'student') {
+    console.log('[Router] Student route but not student, redirecting');
     return next('/teacher/dashboard');
   }
 
   // Allow navigation
+  console.log('[Router] Navigation allowed');
   next();
 });
 

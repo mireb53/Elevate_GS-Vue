@@ -26,8 +26,14 @@ const setupConnection = () => {
   const userId = localStorage.getItem('loggedInUserId')
   const authToken = localStorage.getItem('sse_auth_token')  // Use SSE-specific token
   
-  if (!userId || !authToken) {
-    console.log('[App.vue] Not logged in - userId:', userId, 'authToken:', authToken ? 'exists' : 'missing')
+  // Don't try to connect if not logged in
+  if (!userId || userId === 'null' || userId === 'undefined') {
+    console.log('[App.vue] Not logged in - skipping SSE connection')
+    return
+  }
+  
+  if (!authToken) {
+    console.log('[App.vue] No auth token - skipping SSE connection')
     return
   }
   
