@@ -297,6 +297,107 @@ class ClassesController extends Controller
         ]);
     }
 
+    // GET /api/classes/{id}/grades/summary — minimal student summary
+    public function gradeSummary(Request $request, $id)
+    {
+        $userId = (int)($request->header('x-user-id') ?: $request->query('userId') ?: 0);
+        $items = [];
+        $categories = [];
+        $overall = ['earned' => 0, 'possible' => 0, 'percentRaw' => null, 'weightingApplied' => false];
+
+        if (DB::getSchemaBuilder()->hasTable('classwork')) {
+            $rows = DB::table('classwork')->where('class_id', $id)->orderBy('created_at', 'desc')->get();
+            foreach ($rows as $cw) {
+                // find student's submission if table exists
+                $submission = null;
+                if ($userId && DB::getSchemaBuilder()->hasTable('classwork_submissions')) {
+                    $submission = DB::table('classwork_submissions')
+                        ->where(['classwork_id' => $cw->id, 'user_id' => $userId])
+                        ->first();
+                }
+                $score = null; $max = null; $percent = null; $status = 'Assigned'; $late = false; $submittedAt = null;
+                if ($submission) {
+                    $submittedAt = $submission->submitted_at ?: $submission->created_at;
+                    if (!empty($submission->grade_json)) {
+                        $g = json_decode($submission->grade_json, true);
+                        $score = $g['score'] ?? null;
+                        $max = $g['totalPoints'] ?? 100;
+                        $percent = ($score !== null && $max) ? ($score / $max) * 100 : null;
+                        $status = 'Graded';
+                    } else {
+                        $status = 'Submitted';
+                    }
+                } else if (!empty($cw->due_at) && strtotime($cw->due_at) < time()) {
+                    $status = 'Missing';
+                    $late = true;
+                }
+
+                // Normalize type groups similar to legacy
+                $type = $cw->type ?: 'Other';
+                $group = $type;
+                if (strcasecmp($type, 'activity') === 0 || strcasecmp($type, 'assignment') === 0) $group = 'Performance Task';
+
+                $items[] = [
+                    'id' => $cw->id,
+                    'title' => $cw->title,
+                    'type' => $group,
+                    'score' => $score,
+                    'max' => $max,
+                    'percent' => $percent,
+                    'status' => $status,
+                    'late' => (bool)$late,
+                    'dueAt' => $cw->due_at,
+                    'submittedAt' => $submittedAt,
+                ];
+
+                if ($score !== null) {
+                    $overall['earned'] += (float)$score;
+                    $overall['possible'] += (float)($max ?: 100);
+                }
+                // accumulate categories simple sum
+                if (!isset($categories[$group])) $categories[$group] = ['earned' => 0, 'possible' => 0, 'percent' => null, 'weight' => null];
+                if ($score !== null) {
+                    $categories[$group]['earned'] += (float)$score;
+                    $categories[$group]['possible'] += (float)($max ?: 100);
+                }
+            }
+        }
+
+        foreach ($categories as $k => $c) {
+            $categories[$k]['percent'] = $c['possible'] > 0 ? ($c['earned'] / $c['possible']) * 100 : null;
+        }
+        if ($overall['possible'] > 0) $overall['percentRaw'] = ($overall['earned'] / $overall['possible']) * 100;
+
+        return response()->json([
+            'items' => $items,
+            'categories' => $categories,
+            'overall' => $overall,
+        ]);
+    }
+
+    // GET /api/classes/{id}/grades/self — minimal state about visibility
+    public function gradeSelf(Request $request, $id)
+    {
+        $userId = (int)($request->header('x-user-id') ?: $request->query('userId') ?: 0);
+        // For now, always visible; in future this can depend on approvals
+        return response()->json([
+            'userId' => $userId ?: null,
+            'midterm' => null,
+            'tentativeFinal' => null,
+            'final' => null,
+            'finalVisible' => true,
+            'finalRequested' => false,
+        ]);
+    }
+
+    // POST /api/classes/{id}/final/request — accept and return visible=true to unlock
+    public function finalRequest(Request $request, $id)
+    {
+        // In a fuller implementation, store request and require teacher approval.
+        // For now, auto-approve for demo purposes.
+        return response()->json(['ok' => true, 'approved' => true]);
+    }
+
     // POST /api/classes/{id}/classwork (JSON body)
     public function createClasswork(Request $request, $classId)
     {
@@ -419,6 +520,98 @@ class ClassesController extends Controller
         } else if (!empty($data['userId'])) {
             DB::table('classwork_submissions')->where(['classwork_id'=>$classworkId,'user_id'=>$data['userId']])->update(['grade_json'=>json_encode($grade),'updated_at'=>now()]);
         }
+        return response()->json(['ok'=>true]);
+    }
+
+    // GET /api/classwork/{id}
+    public function getClasswork(Request $request, $id)
+    {
+        if (!DB::getSchemaBuilder()->hasTable('classwork')) return response()->json(['message'=>'Not found'], 404);
+        $row = DB::table('classwork')->where('id',$id)->first();
+        if (!$row) return response()->json(['message'=>'Not found'], 404);
+        // normalize: include quiz/rubric from JSON columns
+        $extra = $row->extra_json ? json_decode($row->extra_json, true) : [];
+        $rubric = $row->rubric_json ? json_decode($row->rubric_json, true) : null;
+        $out = [
+            'id' => $row->id,
+            'class_id' => $row->class_id,
+            'title' => $row->title,
+            'type' => $row->type,
+            'description' => $row->description,
+            'due_at' => $row->due_at,
+            'created_at' => $row->created_at,
+            'updated_at' => $row->updated_at,
+            'rubric' => $rubric,
+        ];
+        if (isset($extra['quiz'])) $out['quiz'] = $extra['quiz'];
+        if (isset($extra['materialFiles'])) $out['materialFiles'] = $extra['materialFiles'];
+        if (isset($extra['materialFile'])) $out['materialFile'] = $extra['materialFile'];
+        return response()->json($out);
+    }
+
+    // GET /api/classwork/{id}/submission/me
+    public function getMySubmission(Request $request, $id)
+    {
+        if (!DB::getSchemaBuilder()->hasTable('classwork_submissions')) return response()->json(['submitted'=>false]);
+        $userId = (int)($request->header('x-user-id') ?: $request->query('userId') ?: 0);
+        if (!$userId) return response()->json(['submitted'=>false]);
+        $row = DB::table('classwork_submissions')->where(['classwork_id'=>$id,'user_id'=>$userId])->first();
+        if (!$row) return response()->json(['submitted'=>false]);
+        return response()->json([
+            'id' => $row->id,
+            'submitted' => true,
+            'submission_time' => $row->submitted_at ?: $row->created_at,
+            'files' => $row->files_json ? json_decode($row->files_json, true) : [],
+            'grade' => $row->grade_json ? json_decode($row->grade_json, true) : null,
+            'answers' => $row->answers_json ? json_decode($row->answers_json, true) : null,
+        ]);
+    }
+
+    // POST /api/classwork/{id}/submit
+    public function submitClasswork(Request $request, $id)
+    {
+        if (!DB::getSchemaBuilder()->hasTable('classwork_submissions')) return response()->json(['message'=>'Submissions disabled'], 404);
+        $userId = (int)($request->header('x-user-id') ?: $request->query('userId') ?: 0);
+        if (!$userId) return response()->json(['message'=>'Missing user'], 422);
+
+        $filesMeta = [];
+        $files = $request->file('attachments');
+        if ($files) {
+            foreach ((array)$files as $f) {
+                try { $filesMeta[] = ['originalName'=>$f->getClientOriginalName(), 'storedName'=>$f->hashName(), 'url'=>'']; } catch (\Throwable $e) { /* ignore */ }
+            }
+        }
+        $answers = null;
+        if ($request->has('answers')) {
+            $raw = $request->input('answers');
+            $answers = is_string($raw) ? json_decode($raw, true) : $raw;
+        }
+        $payload = [
+            'classwork_id' => (int)$id,
+            'user_id' => $userId,
+            'submitted_at' => now(),
+            'files_json' => $filesMeta ? json_encode($filesMeta) : null,
+            'grade_json' => null,
+            'answers_json' => $answers ? json_encode($answers) : null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ];
+        // Upsert: if a submission already exists, update it
+        $existing = DB::table('classwork_submissions')->where(['classwork_id'=>$id,'user_id'=>$userId])->first();
+        if ($existing) {
+            DB::table('classwork_submissions')->where('id',$existing->id)->update($payload);
+            $sid = $existing->id;
+        } else {
+            $sid = DB::table('classwork_submissions')->insertGetId($payload);
+        }
+        return response()->json(['ok'=>true,'id'=>$sid]);
+    }
+
+    // DELETE /api/submissions/{id}
+    public function deleteSubmission(Request $request, $id)
+    {
+        if (!DB::getSchemaBuilder()->hasTable('classwork_submissions')) return response()->json(['ok'=>true]);
+        DB::table('classwork_submissions')->where('id',$id)->delete();
         return response()->json(['ok'=>true]);
     }
 }

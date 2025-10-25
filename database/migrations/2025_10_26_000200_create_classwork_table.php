@@ -28,6 +28,7 @@ return new class extends Migration
                 $table->unsignedBigInteger('user_id');
                 $table->timestamp('submitted_at')->nullable();
                 $table->longText('files_json')->nullable();
+                $table->longText('answers_json')->nullable();
                 $table->longText('grade_json')->nullable();
                 $table->timestamps();
             });

@@ -31,6 +31,10 @@ use App\Http\Controllers\Api\UsersController;
     Route::get('/classes/{id}/records', [ClassesController::class, 'records']);
     Route::get('/classes/{id}/gradebook/final-grades', [ClassesController::class, 'finalGrades']);
     Route::get('/classes/{id}/gradesheet', [ClassesController::class, 'gradesheet']);
+    // Student grade views
+    Route::get('/classes/{id}/grades/summary', [ClassesController::class, 'gradeSummary']);
+    Route::get('/classes/{id}/grades/self', [ClassesController::class, 'gradeSelf']);
+    Route::post('/classes/{id}/final/request', [ClassesController::class, 'finalRequest']);
     // Create classwork (JSON and multipart) for a class
     Route::post('/classes/{id}/classwork', [ClassesController::class, 'createClasswork']);
     Route::post('/classes/{id}/classwork/upload', [ClassesController::class, 'uploadClasswork']);
@@ -42,6 +46,11 @@ use App\Http\Controllers\Api\UsersController;
     Route::get('/classwork/{id}/rubric', [ClassesController::class, 'getRubric']);
     Route::post('/classwork/{classworkId}/submissions/{submissionId}/grade', [ClassesController::class, 'gradeSubmission']);
     Route::post('/classwork/{classworkId}/grade', [ClassesController::class, 'gradeSubmission']);
+    // Student flows: get classwork detail, read own submission, submit/unsubmit
+    Route::get('/classwork/{id}', [ClassesController::class, 'getClasswork']);
+    Route::get('/classwork/{id}/submission/me', [ClassesController::class, 'getMySubmission']);
+    Route::post('/classwork/{id}/submit', [ClassesController::class, 'submitClasswork']);
+    Route::delete('/submissions/{id}', [ClassesController::class, 'deleteSubmission']);
     // Classwork item maintenance (used by Stream tab edits)
     Route::put('/classwork/{id}', [ClassesController::class, 'updateClasswork']);
     Route::delete('/classwork/{id}', [ClassesController::class, 'deleteClasswork']);
