@@ -31,6 +31,9 @@ use App\Http\Controllers\Api\UsersController;
     Route::get('/classes/{id}/records', [ClassesController::class, 'records']);
     Route::get('/classes/{id}/gradebook/final-grades', [ClassesController::class, 'finalGrades']);
     Route::get('/classes/{id}/gradesheet', [ClassesController::class, 'gradesheet']);
+    // Gradebook endpoints
+    Route::get('/classes/{id}/gradebook', [ClassesController::class, 'getGradebook']);
+    Route::post('/classes/{id}/gradebook', [ClassesController::class, 'saveGradebook']);
     // Student grade views
     Route::get('/classes/{id}/grades/summary', [ClassesController::class, 'gradeSummary']);
     Route::get('/classes/{id}/grades/self', [ClassesController::class, 'gradeSelf']);

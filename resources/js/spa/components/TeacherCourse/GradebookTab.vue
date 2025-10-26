@@ -1,1003 +1,835 @@
 <template>
   <div class="gradebook-container">
-    <!-- Gradebook Tab Content -->
-    <div id="gradebookContent" class="content-centered">
-      <div class="row g-3 mb-3 justify-content-center">
-        <div class="col-md-6 col-lg-5">
-          <div class="card p-3 h-100">
-            <h5 class="mb-2 text-center">Midterm <span :class="['badge ms-2', midtermStatus === 'completed' ? 'bg-success' : 'bg-secondary']">{{ midtermStatus }}</span></h5>
-            <div class="d-flex flex-column gap-2 mt-2">
-              <button class="btn btn-outline-secondary" @click="viewMidtermExcel" :disabled="loading">
-                <i class="bi bi-file-earmark-excel me-1"></i>Download Excel
-              </button>
-              <button class="btn btn-outline-primary" @click="showMidtermModal = true" :disabled="loading">
-                <i class="bi bi-pencil-square me-1"></i>Edit Grades
-              </button>
-              <button class="btn btn-primary" @click="markMidtermComplete" :disabled="midtermStatus === 'completed' || loading">
-                <i class="bi bi-check-circle me-1"></i>Mark Complete
-              </button>
+    <!-- Period Percentage Configuration -->
+    <div class="row mb-4">
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-body">
+            <h5 class="card-title mb-3">Grading Period Weights</h5>
+            <div class="row g-3">
+              <div class="col-6">
+                <label class="form-label">Midterm Percentage</label>
+                <div class="input-group">
+                  <input 
+                    type="number" 
+                    class="form-control" 
+                    v-model.number="midtermPercentage" 
+                    min="0" 
+                    max="100"
+                    @blur="validatePeriodPercentages"
+                  />
+                  <span class="input-group-text">%</span>
+                </div>
+              </div>
+              <div class="col-6">
+                <label class="form-label">Finals Percentage</label>
+                <div class="input-group">
+                  <input 
+                    type="number" 
+                    class="form-control" 
+                    v-model.number="finalsPercentage" 
+                    min="0" 
+                    max="100"
+                    @blur="validatePeriodPercentages"
+                  />
+                  <span class="input-group-text">%</span>
+                </div>
+              </div>
             </div>
-            <p class="mt-3 mb-0 text-center"><small class="text-muted">Completed: <strong>{{ midtermCompletedDate || '-' }}</strong></small></p>
-          </div>
-        </div>
-        <div class="col-md-6 col-lg-5">
-          <div class="card p-3 h-100">
-            <h5 class="mb-2 text-center">Final <span :class="['badge ms-2', finalStatus === 'completed' ? 'bg-success' : 'bg-secondary']">{{ finalStatus }}</span></h5>
-            <div class="d-flex flex-column gap-2 mt-2">
-              <button class="btn btn-outline-secondary" @click="viewFinal" :disabled="loading">
-                <i class="bi bi-eye me-1"></i>View Full Sheet
-              </button>
-              <button class="btn btn-primary" @click="markFinalComplete" :disabled="finalStatus === 'completed' || loading">
-                <i class="bi bi-check-circle me-1"></i>Mark Complete
-              </button>
-              <button class="btn btn-info" @click="downloadGradesheet" :disabled="loading">
-                <i class="bi bi-download me-1"></i>Download Gradesheet
-              </button>
+            <div v-if="periodPercentageError" class="alert alert-warning mt-2 mb-0 py-2">
+              <i class="bi bi-exclamation-triangle me-2"></i>{{ periodPercentageError }}
             </div>
-            <p class="mt-3 mb-0 text-center"><small class="text-muted">Completed: <strong>{{ finalCompletedDate || '-' }}</strong></small></p>
-          </div>
-        </div>
-      </div>
-
-      <div class="card p-3 mb-3 mx-auto" style="max-width: 900px;">
-        <h6 class="mb-3 text-center">Grade Weights Configuration</h6>
-        <div class="row g-3 align-items-center justify-content-center">
-          <div class="col-md-5">
-            <label class="form-label mb-1">Midterm Weight</label>
-            <div class="input-group">
-              <input v-model.number="midtermWeightInput" type="number" min="0" max="100" class="form-control text-center" />
-              <span class="input-group-text">%</span>
-            </div>
-            <small class="text-muted">Current: <strong>{{ midtermWeight }}%</strong></small>
-          </div>
-          <div class="col-md-5">
-            <label class="form-label mb-1">Final Weight</label>
-            <div class="input-group">
-              <input v-model.number="finalWeightInput" type="number" min="0" max="100" class="form-control text-center" />
-              <span class="input-group-text">%</span>
-            </div>
-            <small class="text-muted">Current: <strong>{{ finalWeight }}%</strong></small>
-          </div>
-          <div class="col-md-12 text-center mt-3">
-            <button class="btn btn-primary" @click="updateWeights" :disabled="loading">
-              <i class="bi bi-save me-1"></i>Update Weights
-            </button>
           </div>
         </div>
       </div>
+    </div>
 
-      <div class="card p-3 mx-auto" style="max-width: 1200px;">
-        <div class="d-flex align-items-center justify-content-between mb-3">
-          <h6 class="mb-0">Final Grades Summary</h6>
-          <div>
-            <button class="btn btn-sm btn-outline-secondary me-2" @click="showAddColumn = true">
-              <i class="bi bi-plus-circle me-1"></i>Add Manual Column
-            </button>
-            <button class="btn btn-sm btn-outline-secondary" @click="showSettings = true">
-              <i class="bi bi-gear me-1"></i>Settings
-            </button>
+    <!-- Period Selection Cards -->
+    <div class="row mb-4">
+      <div class="col-md-6 mb-3">
+        <div 
+          class="period-card midterm-card" 
+          :class="{ active: activePeriod === 'midterm' }"
+          @click="togglePeriod('midterm')"
+        >
+          <div class="period-icon">🟩</div>
+          <h4>Midterm</h4>
+          <p class="mb-0">{{ midtermPercentage }}% of Final Grade</p>
+        </div>
+      </div>
+      <div class="col-md-6 mb-3">
+        <div 
+          class="period-card finals-card" 
+          :class="{ active: activePeriod === 'finals' }"
+          @click="togglePeriod('finals')"
+        >
+          <div class="period-icon">🟦</div>
+          <h4>Finals</h4>
+          <p class="mb-0">{{ finalsPercentage }}% of Final Grade</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Grading Tables (shown when a period is active) -->
+    <div v-if="activePeriod" class="grading-section">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4>{{ activePeriod === 'midterm' ? 'Midterm' : 'Finals' }} Grading Tables</h4>
+        <button class="btn btn-primary btn-sm" @click="addNewTable">
+          <i class="bi bi-plus-circle me-1"></i> Add Custom Table
+        </button>
+      </div>
+
+      <!-- Total Percentage Warning -->
+      <div v-if="tablesTotalPercentage > 100" class="alert alert-danger">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+        Total grading percentage exceeds 100%. Current total: {{ tablesTotalPercentage.toFixed(1) }}%. Please adjust your table weights.
+      </div>
+
+      <!-- Default and Custom Tables -->
+      <div v-for="table in currentTables" :key="table.id" class="mb-4">
+        <div class="table-header-controls">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <div class="d-flex align-items-center gap-3">
+              <input 
+                v-if="table.editable"
+                type="text" 
+                class="form-control form-control-sm table-name-input" 
+                v-model="table.name"
+              />
+              <h5 v-else class="mb-0">{{ table.name }}</h5>
+              <div class="input-group input-group-sm" style="width: 150px;">
+                <input 
+                  type="number" 
+                  class="form-control" 
+                  v-model.number="table.percentage" 
+                  min="0" 
+                  max="100"
+                  @blur="validateTablePercentages"
+                />
+                <span class="input-group-text">%</span>
+              </div>
+            </div>
+            <div class="btn-group btn-group-sm">
+              <button 
+                class="btn btn-outline-primary" 
+                @click="addColumn(table)"
+                :title="`Add column to ${table.name}`"
+              >
+                <i class="bi bi-plus"></i> Add Column
+              </button>
+              <button 
+                v-if="!table.isDefault"
+                class="btn btn-outline-danger" 
+                @click="removeTable(table.id)"
+                title="Remove this table"
+              >
+                <i class="bi bi-trash"></i>
+              </button>
+            </div>
+          </div>
+          <div v-if="getTableTotalPercentage(table) > table.percentage" class="alert alert-warning py-2">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            Total percentage for {{ table.name }} exceeds {{ table.percentage }}%. Adjust column percentages.
           </div>
         </div>
-        <div class="table-responsive">
-          <table class="table table-sm table-striped table-hover">
-            <thead class="table-light">
-              <tr>
-                <th class="text-center">#</th>
-                <th>Name</th>
-                <th>Program</th>
-                <th class="text-center">Midterm</th>
-                <th class="text-center">Final</th>
-                <th class="text-center">Overall</th>
+
+        <!-- Grading Table -->
+        <div class="table-responsive gradebook-table-wrapper">
+          <table class="table table-bordered gradebook-table">
+            <thead>
+              <!-- Main Column Headers -->
+              <tr class="table-primary">
+                <th rowspan="2" class="student-name-column">Student Name</th>
+                <th 
+                  v-for="col in table.columns" 
+                  :key="col.id"
+                  :colspan="col.subcolumns?.length || 1"
+                  class="main-column-header"
+                >
+                  <div class="d-flex justify-content-between align-items-center">
+                    <input 
+                      v-if="!col.fixed"
+                      type="text" 
+                      class="form-control form-control-sm column-name-input" 
+                      v-model="col.name"
+                    />
+                    <span v-else>{{ col.name }}</span>
+                    <div class="d-flex align-items-center gap-2">
+                      <div class="input-group input-group-sm" style="width: 100px;">
+                        <input 
+                          type="number" 
+                          class="form-control" 
+                          v-model.number="col.percentage" 
+                          min="0" 
+                          :max="table.percentage"
+                          @blur="validateTablePercentages"
+                        />
+                        <span class="input-group-text">%</span>
+                      </div>
+                      <button 
+                        class="btn btn-sm btn-outline-primary" 
+                        @click="addSubcolumn(table, col)"
+                        title="Add subcolumn"
+                      >
+                        <i class="bi bi-plus-circle"></i>
+                      </button>
+                      <button 
+                        v-if="!col.fixed"
+                        class="btn btn-sm btn-outline-danger" 
+                        @click="removeColumn(table, col.id)"
+                        title="Remove column"
+                      >
+                        <i class="bi bi-x-circle"></i>
+                      </button>
+                    </div>
+                  </div>
+                </th>
+                <th rowspan="2" class="total-column">Total ({{ table.percentage }}%)</th>
+              </tr>
+              <!-- Subcolumn Headers -->
+              <tr class="table-secondary">
+                <template v-for="col in table.columns" :key="'sub-' + col.id">
+                  <th 
+                    v-for="subcol in (col.subcolumns || [])" 
+                    :key="subcol.id"
+                    class="subcolumn-header"
+                  >
+                    <div class="d-flex justify-content-between align-items-center">
+                      <input 
+                        v-if="!subcol.autoGenerated"
+                        type="text" 
+                        class="form-control form-control-sm subcolumn-name-input" 
+                        v-model="subcol.name"
+                      />
+                      <span v-else class="auto-generated-label">{{ subcol.name }}</span>
+                      <button 
+                        v-if="!subcol.autoGenerated"
+                        class="btn btn-sm btn-link text-danger p-0" 
+                        @click="removeSubcolumn(table, col.id, subcol.id)"
+                        title="Remove subcolumn"
+                      >
+                        <i class="bi bi-x-circle"></i>
+                      </button>
+                    </div>
+                  </th>
+                </template>
               </tr>
             </thead>
             <tbody>
-              <tr v-if="loading">
-                <td colspan="6" class="text-center text-muted py-4">
-                  <div class="spinner-border spinner-border-sm me-2" role="status"></div>
-                  Loading grades...
+              <tr v-for="student in students" :key="student.id">
+                <td class="student-name-column">{{ getStudentName(student) }}</td>
+                <template v-for="col in table.columns" :key="'grade-' + col.id">
+                  <td 
+                    v-for="subcol in (col.subcolumns || [])" 
+                    :key="'grade-' + subcol.id"
+                    class="grade-cell"
+                  >
+                    <input 
+                      type="number" 
+                      class="form-control form-control-sm grade-input" 
+                      :value="getGrade(student.id, table.id, col.id, subcol.id)"
+                      min="0" 
+                      max="100"
+                      @input="updateGrade(student.id, table.id, col.id, subcol.id, $event)"
+                    />
+                  </td>
+                </template>
+                <td class="total-column">
+                  <strong>{{ calculateStudentTableTotal(student.id, table).toFixed(2) }}</strong>
                 </td>
-              </tr>
-              <tr v-else-if="!grades.length">
-                <td colspan="6" class="text-center text-muted py-4">
-                  <i class="bi bi-inbox me-2"></i>No grades available.
-                </td>
-              </tr>
-              <tr v-else v-for="(grade, idx) in grades" :key="grade.id">
-                <td class="text-center">{{ idx + 1 }}</td>
-                <td><strong>{{ grade.name }}</strong></td>
-                <td>{{ grade.program || '-' }}</td>
-                <td class="text-center"><span class="badge bg-info">{{ grade.midterm || '-' }}</span></td>
-                <td class="text-center"><span class="badge bg-warning">{{ grade.final || '-' }}</span></td>
-                <td class="text-center"><span class="badge bg-success">{{ grade.overall || '-' }}</span></td>
               </tr>
             </tbody>
           </table>
         </div>
       </div>
-    </div>
-  </div>
-  <!-- Midterm Modal -->
-  <div class="modal-backdrop-custom" v-if="showMidtermModal" @click.self="showMidtermModal = false">
-    <div class="modal-dialog-custom modal-xl-custom">
-      <div class="modal-content-custom">
-        <div class="modal-header-custom">
-          <div class="d-flex align-items-center gap-2">
-            <i class="bi bi-table text-primary"></i>
-            <h5 class="modal-title mb-0">Midterm Grading Sheet</h5>
-          </div>
-          <button type="button" class="btn-close-custom" aria-label="Close" @click="showMidtermModal = false">
-            <i class="bi bi-x-lg"></i>
-          </button>
-        </div>
-        <div class="modal-body-custom">
-          <!-- pass primitive string to avoid reactive Proxy exposure in child -->
-          <MidtermSheetView :classId="String(resolvedClassId() || '')" />
-        </div>
-        <div class="modal-footer-custom">
-          <button class="btn btn-secondary" @click="showMidtermModal = false">
-            <i class="bi bi-x-circle me-1"></i>Close
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-  <!-- Upload Preview Modal -->
-  <div class="modal show" tabindex="-1" v-if="showUploadPreview" @click.self="showUploadPreview = false">
-    <div class="modal-dialog modal-lg">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title">Upload Preview</h5>
-          <button type="button" class="btn-close" aria-label="Close" @click="showUploadPreview = false"></button>
-        </div>
-        <div class="modal-body">
-          <div v-if="uploadPreview && uploadPreview.preview && uploadPreview.preview.length">
-            <p class="small text-muted">Preview expires at: {{ uploadPreview.expiresAt || '-' }}</p>
-            <div class="list-group">
-              <div class="list-group-item" v-for="entry in uploadPreview.preview" :key="entry.studentId">
-                <div class="d-flex justify-content-between">
-                  <strong>{{ entry.studentName || ('Student ' + entry.studentId) }}</strong>
-                  <small class="text-muted">Changes: {{ entry.changes.length }}</small>
-                </div>
-                <ul class="mb-0 mt-2">
-                  <li v-for="(ch, idx) in entry.changes" :key="(ch.columnKey || ch.field) + '_' + idx">
-                    <div class="form-check">
-                      <input class="form-check-input" type="checkbox" :id="`chk_${entry.studentId}_${idx}`" v-model="ch.__accepted" />
-                      <label class="form-check-label" :for="`chk_${entry.studentId}_${idx}`">
-                        <span v-if="ch.field">{{ ch.field }}: </span>
-                        <strong v-if="ch.columnKey">{{ ch.label || ch.columnKey }}</strong>
-                        <span class="ms-2 text-muted">before: {{ ch.before }}</span>
-                        <span class="ms-2">→ after: <strong>{{ ch.after }}</strong></span>
-                      </label>
-                    </div>
-                  </li>
-                </ul>
-              </div>
-            </div>
-          </div>
-          <div v-else class="text-center text-muted">No changes to preview.</div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-secondary" @click="showUploadPreview = false">Cancel</button>
-            <button class="btn btn-primary" @click="commitUploadPreview">Apply Selected Changes</button>
-        </div>
-      </div>
-    </div>
-  </div>
-  <!-- Add Manual Column Modal -->
-  <div class="modal show" tabindex="-1" v-if="showAddColumn" @click.self="showAddColumn = false">
-    <div class="modal-dialog">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title">Add Manual Column</h5>
-          <button type="button" class="btn-close" aria-label="Close" @click="showAddColumn = false"></button>
-        </div>
-        <div class="modal-body">
-          <div class="mb-2">
-            <label class="form-label">Column Label</label>
-            <input v-model="newColLabel" class="form-control" placeholder="e.g. Attendance Week 1" />
-          </div>
-          <div class="mb-2">
-            <label class="form-label">Term</label>
-            <select v-model="newColTerm" class="form-select">
-              <option value="midterm">Midterm</option>
-              <option value="final">Final</option>
-            </select>
-          </div>
-          <div class="mb-2">
-            <label class="form-label">Max Points (optional)</label>
-            <input v-model.number="newColMax" type="number" min="0" class="form-control" />
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-secondary" @click="showAddColumn = false">Cancel</button>
-          <button class="btn btn-primary" @click="addManualColumn">Add Column</button>
-        </div>
-      </div>
-    </div>
-  </div>
 
-  <!-- Settings Modal -->
-  <div class="modal show" tabindex="-1" v-if="showSettings" @click.self="showSettings = false">
-    <div class="modal-dialog">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title">Gradebook Settings</h5>
-          <button type="button" class="btn-close" aria-label="Close" @click="showSettings = false"></button>
+      <!-- Computation Summary Table -->
+      <div class="computation-summary mt-5">
+        <h4 class="mb-3">{{ activePeriod === 'midterm' ? 'Midterm' : 'Finals' }} Grade Summary</h4>
+        <div class="table-responsive">
+          <table class="table table-bordered table-striped">
+            <thead class="table-dark">
+              <tr>
+                <th>Student Name</th>
+                <th v-for="table in currentTables" :key="'summary-' + table.id">
+                  {{ table.name }} ({{ table.percentage }}%)
+                </th>
+                <th>{{ activePeriod === 'midterm' ? 'Midterm' : 'Finals' }} Grade (100%)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="student in students" :key="'summary-' + student.id">
+                <td><strong>{{ getStudentName(student) }}</strong></td>
+                <td v-for="table in currentTables" :key="'summary-val-' + table.id" class="text-end">
+                  {{ calculateStudentTableTotal(student.id, table).toFixed(2) }}
+                </td>
+                <td class="text-end">
+                  <strong class="text-primary">{{ calculateStudentPeriodGrade(student.id).toFixed(2) }}</strong>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
-        <div class="modal-body">
-          <p>Adjust midterm and final weights. Weights must sum to 100%.</p>
-          <div class="d-flex gap-2">
-            <div>
-              <label class="form-label">Midterm Weight</label>
-              <input v-model.number="midtermWeightInput" type="number" min="0" max="100" class="form-control" />
-            </div>
-            <div>
-              <label class="form-label">Final Weight</label>
-              <input v-model.number="finalWeightInput" type="number" min="0" max="100" class="form-control" />
-            </div>
-          </div>
-          <div class="mt-3">
-            <label class="form-label">Advanced: Edit JSON</label>
-            <textarea class="form-control" rows="4" v-model="weightsJson"></textarea>
-            <small class="text-muted">Optional: edit JSON like { "midterm": 40, "final": 60 }</small>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-secondary" @click="showSettings = false">Close</button>
-          <button class="btn btn-primary" @click="saveSettings">Save</button>
-        </div>
+      </div>
+
+      <!-- Save Button -->
+      <div class="text-end mt-4">
+        <button class="btn btn-success btn-lg" @click="saveGradebook">
+          <i class="bi bi-save me-2"></i> Save Gradebook
+        </button>
       </div>
     </div>
   </div>
 </template>
+
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 
-const props = defineProps({ classId: [String, Number] })
-import { useRoute, useRouter } from 'vue-router'
 const route = useRoute()
-const router = useRouter()
-import MidtermSheetView from '../../views/MidtermSheetView.vue'
-import GradebookSheet from './GradebookSheet.vue'
-import GradebookToolbar from './GradebookToolbar.vue'
-import GradebookUpload from './GradebookUpload.vue'
-import { API_BASE } from '../../services/apiBase'
+const courseId = computed(() => route.params.courseId)
 
-const showMidtermModal = ref(false)
-const showUploadPreview = ref(false)
-const uploadPreview = ref(null)
+// Period configuration
+const midtermPercentage = ref(50)
+const finalsPercentage = ref(50)
+const periodPercentageError = ref('')
+const activePeriod = ref(null)
 
-const loading = ref(false)
-const midtermStatus = ref('pending')
-const finalStatus = ref('pending')
-const midtermCompletedDate = ref('')
-const finalCompletedDate = ref('')
-const midtermWeight = ref(40)
-const finalWeight = ref(60)
-const midtermWeightInput = ref(40)
-const finalWeightInput = ref(60)
-const grades = ref([])
-const midtermData = ref(null)
-const finalData = ref(null)
-const showAddColumn = ref(false)
-const newColLabel = ref('')
-const newColTerm = ref('midterm')
-const newColMax = ref(null)
-const showSettings = ref(false)
-const weightsJson = ref('')
+// Students data
+const students = ref([])
 
-// Use centralized API_BASE from services
+// Gradebook data structure
+const midtermTables = ref([])
+const finalsTables = ref([])
 
-// computed: total number of preview changes
-const totalPreviewChanges = computed(() => {
-  if (!uploadPreview.value || !Array.isArray(uploadPreview.value.preview)) return 0
-  return uploadPreview.value.preview.reduce((acc, e) => acc + (Array.isArray(e.changes) ? e.changes.length : 0), 0)
+// Grades storage: { studentId: { tableId: { columnId: { subcolumnId: grade } } } }
+const grades = ref({})
+
+// Computed: Current tables based on active period
+const currentTables = computed(() => {
+  return activePeriod.value === 'midterm' ? midtermTables.value : finalsTables.value
 })
 
-function selectAllPreviewChanges() {
-  if (!uploadPreview.value || !Array.isArray(uploadPreview.value.preview)) return
-  for (const entry of uploadPreview.value.preview) {
-    if (Array.isArray(entry.changes)) {
-      for (const ch of entry.changes) ch.__accepted = true
-    }
+// Computed: Total percentage across all tables
+const tablesTotalPercentage = computed(() => {
+  return currentTables.value.reduce((sum, table) => sum + (table.percentage || 0), 0)
+})
+
+// Validate period percentages
+function validatePeriodPercentages() {
+  const total = midtermPercentage.value + finalsPercentage.value
+  if (total !== 100) {
+    periodPercentageError.value = `Warning: Midterm + Finals should equal 100%. Current total: ${total}%`
+  } else {
+    periodPercentageError.value = ''
   }
 }
 
-function deselectAllPreviewChanges() {
-  if (!uploadPreview.value || !Array.isArray(uploadPreview.value.preview)) return
-  for (const entry of uploadPreview.value.preview) {
-    if (Array.isArray(entry.changes)) {
-      for (const ch of entry.changes) ch.__accepted = false
-    }
+// Validate table percentages
+function validateTablePercentages() {
+  // This is called when table or column percentages change
+  // The warnings are shown in the template using computed values
+}
+
+// Get table total percentage (sum of all column percentages)
+function getTableTotalPercentage(table) {
+  return table.columns.reduce((sum, col) => sum + (col.percentage || 0), 0)
+}
+
+// Toggle period
+function togglePeriod(period) {
+  if (activePeriod.value === period) {
+    activePeriod.value = null
+  } else {
+    activePeriod.value = period
+    ensureDefaultTables()
   }
 }
 
-function acceptAllForStudent(entry) {
-  if (!entry || !Array.isArray(entry.changes)) return
-  for (const ch of entry.changes) ch.__accepted = true
-}
-
-async function onUploadFile(e) {
-  const files = e.target.files;
-  if (!files || !files.length) return;
-  const file = files[0];
-  const cid = resolvedClassId();
-  if (!cid) return alert('Invalid class');
-  if (!confirm('Upload this edited Excel and preview changes?')) return;
-  loading.value = true;
-    try {
-    const fd = new FormData();
-    fd.append('file', file);
-    const res = await fetch(`${API_BASE}/api/classes/${cid}/gradebook/upload`, {
-      method: 'POST',
-      credentials: 'include',
-      body: fd,
-      headers: { 'x-user-id': localStorage.getItem('loggedInUserId') || '' }
-    });
-    if (!res.ok) {
-      let b = '';
-      try { b = await res.json(); } catch(_) { b = await res.text().catch(()=>'') }
-      return alert('Upload failed: ' + (b && b.message ? b.message : res.status));
-    }
-    const payload = await res.json();
-    const token = payload.token;
-    const count = payload.previewCount || 0;
-    if (!token) return alert('Preview failed: no token returned.');
-    if (count === 0) return alert('No changes detected.');
-
-    // Fetch the persisted preview details from the server and show the preview modal
-    try {
-      const previewRes = await fetch(`${API_BASE}/api/classes/${cid}/gradebook/upload/preview?token=${encodeURIComponent(token)}`, {
-        credentials: 'include',
-        headers: { 'x-user-id': localStorage.getItem('loggedInUserId') || '' }
-      });
-      if (!previewRes.ok) {
-        let b = '';
-        try { b = await previewRes.json(); } catch(_) { b = await previewRes.text().catch(()=>'') }
-        return alert('Failed to load preview: ' + (b && b.message ? b.message : previewRes.status));
-      }
-      const pv = await previewRes.json();
-      // Ensure preview entries initialize as accepted by default so teachers can quickly deselect if needed
-      if (pv && Array.isArray(pv.preview)) {
-        for (const entry of pv.preview) {
-          if (Array.isArray(entry.changes)) {
-            for (const ch of entry.changes) {
-              // avoid overwriting an explicit false value
-              if (typeof ch.__accepted === 'undefined') ch.__accepted = true;
-            }
+// Ensure default tables exist for the active period
+function ensureDefaultTables() {
+  const tables = activePeriod.value === 'midterm' ? midtermTables.value : finalsTables.value
+  
+  if (tables.length === 0) {
+    // Create default tables
+    const defaults = [
+      {
+        id: generateId(),
+        name: 'Asynchronous',
+        percentage: 35,
+        isDefault: true,
+        editable: false,
+        columns: [
+          {
+            id: generateId(),
+            name: 'Written Works',
+            percentage: 35,
+            fixed: true,
+            subcolumns: []
           }
-        }
+        ]
+      },
+      {
+        id: generateId(),
+        name: 'Synchronous',
+        percentage: 35,
+        isDefault: true,
+        editable: false,
+        columns: []
+      },
+      {
+        id: generateId(),
+        name: 'Major Exam',
+        percentage: 30,
+        isDefault: true,
+        editable: false,
+        columns: [
+          {
+            id: generateId(),
+            name: 'Exam',
+            percentage: 30,
+            fixed: false,
+            subcolumns: [
+              {
+                id: generateId(),
+                name: `${activePeriod.value === 'midterm' ? 'Midterm' : 'Finals'} Exam 1`,
+                autoGenerated: false
+              }
+            ]
+          }
+        ]
       }
-      // Attach token & expiresAt if server returned them
-      uploadPreview.value = { ...(pv || {}), token };
-      showUploadPreview.value = true;
-    } catch (e) {
-      console.error('Failed to fetch preview details', e);
-      return alert('Failed to load preview details');
+    ]
+    
+    if (activePeriod.value === 'midterm') {
+      midtermTables.value = defaults
+    } else {
+      finalsTables.value = defaults
     }
-  } catch (err) {
-    console.error('Upload error', err);
-    alert('Upload failed');
-  } finally { loading.value = false; }
+  }
 }
 
-// wrapper for GradebookUpload component's file-selected event
-function onUploadFileFromComponent(payload) {
-  if (!payload || !payload.file) return;
-  // create a synthetic event object with target.files for reuse
-  onUploadFile({ target: { files: [payload.file] } });
+// Add new custom table
+function addNewTable() {
+  const newTable = {
+    id: generateId(),
+    name: 'New Table',
+    percentage: 0,
+    isDefault: false,
+    editable: true,
+    columns: []
+  }
+  currentTables.value.push(newTable)
 }
 
-function resolvedClassId() {
-  return (props.classId || route.params.courseId || route.params.id || null)
+// Remove table
+function removeTable(tableId) {
+  const tables = activePeriod.value === 'midterm' ? midtermTables.value : finalsTables.value
+  const index = tables.findIndex(t => t.id === tableId)
+  if (index !== -1) {
+    tables.splice(index, 1)
+  }
 }
 
+// Add column to table
+function addColumn(table) {
+  const newColumn = {
+    id: generateId(),
+    name: 'New Column',
+    percentage: 0,
+    fixed: false,
+    subcolumns: [
+      {
+        id: generateId(),
+        name: 'Item 1',
+        autoGenerated: false
+      }
+    ]
+  }
+  table.columns.push(newColumn)
+}
+
+// Remove column
+function removeColumn(table, columnId) {
+  const index = table.columns.findIndex(c => c.id === columnId)
+  if (index !== -1) {
+    table.columns.splice(index, 1)
+  }
+}
+
+// Add subcolumn
+function addSubcolumn(table, column) {
+  if (!column.subcolumns) {
+    column.subcolumns = []
+  }
+  const newSubcolumn = {
+    id: generateId(),
+    name: `Item ${column.subcolumns.length + 1}`,
+    autoGenerated: false
+  }
+  column.subcolumns.push(newSubcolumn)
+}
+
+// Remove subcolumn
+function removeSubcolumn(table, columnId, subcolumnId) {
+  const column = table.columns.find(c => c.id === columnId)
+  if (column && column.subcolumns) {
+    const index = column.subcolumns.findIndex(s => s.id === subcolumnId)
+    if (index !== -1) {
+      column.subcolumns.splice(index, 1)
+    }
+  }
+}
+
+// Get grade value
+function getGrade(studentId, tableId, columnId, subcolumnId) {
+  return grades.value[studentId]?.[tableId]?.[columnId]?.[subcolumnId] || null
+}
+
+// Update grade
+function updateGrade(studentId, tableId, columnId, subcolumnId, event) {
+  const value = parseFloat(event.target.value) || null
+  
+  if (!grades.value[studentId]) grades.value[studentId] = {}
+  if (!grades.value[studentId][tableId]) grades.value[studentId][tableId] = {}
+  if (!grades.value[studentId][tableId][columnId]) grades.value[studentId][tableId][columnId] = {}
+  
+  grades.value[studentId][tableId][columnId][subcolumnId] = value
+}
+
+// Calculate student's total for a specific table
+function calculateStudentTableTotal(studentId, table) {
+  let total = 0
+  
+  table.columns.forEach(col => {
+    const subcolumns = col.subcolumns || []
+    if (subcolumns.length === 0) return
+    
+    // Calculate average of subcolumns
+    let sum = 0
+    let count = 0
+    subcolumns.forEach(subcol => {
+      const grade = getGrade(studentId, table.id, col.id, subcol.id)
+      if (grade !== null && grade !== undefined) {
+        sum += grade
+        count++
+      }
+    })
+    
+    const average = count > 0 ? sum / count : 0
+    const weighted = (average / 100) * (col.percentage || 0)
+    total += weighted
+  })
+  
+  return total
+}
+
+// Calculate student's total grade for the active period
+function calculateStudentPeriodGrade(studentId) {
+  let total = 0
+  
+  currentTables.value.forEach(table => {
+    const tableTotal = calculateStudentTableTotal(studentId, table)
+    total += tableTotal
+  })
+  
+  return total
+}
+
+// Get student name
+function getStudentName(student) {
+  return `${student.first_name || ''} ${student.last_name || ''}`.trim() || student.email || 'Unknown Student'
+}
+
+// Generate unique ID
+function generateId() {
+  return Date.now() + Math.random().toString(36).substr(2, 9)
+}
+
+// Load students for the course
+async function loadStudents() {
+  try {
+    const response = await fetch(`/api/classes/${courseId.value}/people`)
+    if (response.ok) {
+      const data = await response.json()
+      students.value = data.students || []
+    }
+  } catch (error) {
+    console.error('Error loading students:', error)
+  }
+}
+
+// Load classwork for auto-generating Written Works subcolumns
+async function loadClasswork() {
+  try {
+    const response = await fetch(`/api/classes/${courseId.value}/classwork`)
+    if (response.ok) {
+      const classwork = await response.json()
+      autoGenerateWrittenWorksSubcolumns(classwork)
+    }
+  } catch (error) {
+    console.error('Error loading classwork:', error)
+  }
+}
+
+// Auto-generate Written Works subcolumns from classwork
+function autoGenerateWrittenWorksSubcolumns(classwork) {
+  // Find Written Works column in Asynchronous table for both periods
+  const periods = [
+    { tables: midtermTables.value, period: 'midterm' },
+    { tables: finalsTables.value, period: 'finals' }
+  ]
+  
+  periods.forEach(({ tables, period }) => {
+    const asyncTable = tables.find(t => t.name === 'Asynchronous')
+    if (!asyncTable) return
+    
+    const writtenWorksCol = asyncTable.columns.find(c => c.name === 'Written Works')
+    if (!writtenWorksCol) return
+    
+    // Filter classwork by type (Quiz, Assignment, Activity)
+    const relevantWork = classwork.filter(cw => 
+      ['Quiz', 'Assignment', 'Activity'].includes(cw.type)
+    )
+    
+    // Remove existing auto-generated subcolumns
+    writtenWorksCol.subcolumns = writtenWorksCol.subcolumns?.filter(s => !s.autoGenerated) || []
+    
+    // Add new auto-generated subcolumns
+    relevantWork.forEach(work => {
+      writtenWorksCol.subcolumns.push({
+        id: `auto-${work.id}`,
+        name: work.title,
+        autoGenerated: true,
+        classworkId: work.id
+      })
+    })
+  })
+}
+
+// Load gradebook data from server
 async function loadGradebook() {
-  const cid = resolvedClassId()
-  if (!cid) return
-  loading.value = true
   try {
-    // Load grading weights from class record (grading_weights JSON) - fallback to defaults
-    try {
-      const classRes = await fetch(`${API_BASE}/api/classes/${cid}`, {
-        credentials: 'include',
-        headers: { 'x-user-id': localStorage.getItem('loggedInUserId') || '' }
-      })
-      if (classRes.ok) {
-        const cls = await classRes.json()
-        let gw = null
-        try { gw = cls.grading_weights ? (typeof cls.grading_weights === 'string' ? JSON.parse(cls.grading_weights) : cls.grading_weights) : null } catch(e){ gw = null }
-        if (gw && typeof gw === 'object') {
-          midtermWeight.value = Number(gw.midterm) || 40
-          finalWeight.value = Number(gw.final) || 60
-        }
+    const response = await fetch(`/api/classes/${courseId.value}/gradebook`)
+    if (response.ok) {
+      const data = await response.json()
+      if (data.gradebook) {
+        // Restore saved gradebook structure
+        midtermPercentage.value = data.gradebook.midtermPercentage || 50
+        finalsPercentage.value = data.gradebook.finalsPercentage || 50
+        midtermTables.value = data.gradebook.midtermTables || []
+        finalsTables.value = data.gradebook.finalsTables || []
+        grades.value = data.gradebook.grades || {}
       }
-    } catch (e) {
-      console.warn('Failed to load grading weights from class row', e)
     }
-    midtermWeightInput.value = midtermWeight.value
-    finalWeightInput.value = finalWeight.value
-
-    // Load class status & dates (use class endpoint which contains midterm_/final_ fields)
-    try {
-      const classRes = await fetch(`${API_BASE}/api/classes/${cid}`, {
-        credentials: 'include',
-        headers: { 'x-user-id': localStorage.getItem('loggedInUserId') || '' }
-      })
-      if (classRes.ok) {
-        const cls = await classRes.json()
-        midtermStatus.value = cls.midterm_status || 'pending'
-        finalStatus.value = cls.final_status || 'pending'
-        midtermCompletedDate.value = cls.midterm_completed_at ? new Date(cls.midterm_completed_at).toLocaleDateString() : ''
-        finalCompletedDate.value = cls.final_completed_at ? new Date(cls.final_completed_at).toLocaleDateString() : ''
-        try {
-          const gw = cls.grading_weights ? (typeof cls.grading_weights === 'string' ? JSON.parse(cls.grading_weights) : cls.grading_weights) : null
-          if (gw) { midtermWeight.value = Number(gw.midterm) || midtermWeight.value; finalWeight.value = Number(gw.final) || finalWeight.value }
-        } catch(e){}
-      }
-    } catch (e) { console.warn('Failed to fetch class status', e) }
-
-    // Load final grades (instructor view)
-    try {
-      const gradesRes = await fetch(`${API_BASE}/api/classes/${cid}/gradebook/final-grades`, {
-        credentials: 'include',
-        headers: { 'x-user-id': localStorage.getItem('loggedInUserId') || '' }
-      })
-      if (gradesRes.ok) {
-        const payload = await gradesRes.json()
-        const list = Array.isArray(payload.grades) ? payload.grades : payload
-        grades.value = list.map(r => ({
-          id: r.student_id || r.id,
-          name: `${r.first_name || ''} ${r.last_name || ''}`.trim(),
-          program: r.program || '-',
-          midterm: (typeof r.midterm_grade !== 'undefined') ? r.midterm_grade : (r.midterm || null),
-          final: (typeof r.final_grade !== 'undefined') ? r.final_grade : (r.final || null),
-          overall: (typeof r.overall_grade !== 'undefined') ? r.overall_grade : (r.overall || null),
-          remarks: r.remarks || ''
-        }))
-      }
-    } catch (e) {
-      console.warn('Failed to load final grades', e)
-    }
-
-    // Load midterm sheet metadata (to know if a sheet exists and route to editable view)
-    try {
-      const sheetRes = await fetch(`${API_BASE}/api/classes/${cid}/midterm-sheet`, {
-        credentials: 'include',
-        headers: { 'x-user-id': localStorage.getItem('loggedInUserId') || '' }
-      })
-      if (sheetRes.ok) midtermData.value = { exists: true }
-      else midtermData.value = null
-    } catch (e) { midtermData.value = null }
-
-  } catch (e) {
-    console.error('Load gradebook failed', e)
-  } finally {
-    loading.value = false
+  } catch (error) {
+    console.error('Error loading gradebook:', error)
   }
 }
 
-
-function calculateOverall(mid, fin) {
-  if (mid == null || fin == null) return '-'
-  const m = Number(mid) || 0
-  const f = Number(fin) || 0
-  const mw = midtermWeight.value / 100
-  const fw = finalWeight.value / 100
-  return Math.round(m * mw + f * fw)
-}
-
-async function updateWeights() {
-  loading.value = true
-    try {
-      // server expects midtermWeight and finalWeight via PUT /update-weights
-      const res = await fetch(`${API_BASE}/api/classes/${props.classId}/gradebook/update-weights`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-id': localStorage.getItem('loggedInUserId') || ''
-        },
-        body: JSON.stringify({ midtermWeight: Number(midtermWeightInput.value), finalWeight: Number(finalWeightInput.value) })
-      })
-      if (res.ok) {
-        midtermWeight.value = Number(midtermWeightInput.value)
-        finalWeight.value = Number(finalWeightInput.value)
-        // Recalculate overalls
-        grades.value = grades.value.map(g => ({ ...g, overall: calculateOverall(g.midterm, g.final) }))
-        alert('Weights updated')
-      } else {
-        let body = ''
-        try { body = await res.json() } catch(_) { body = await res.text().catch(()=>'') }
-        alert('Failed to update weights: ' + (body && body.message ? body.message : res.status))
-      }
-    } catch (e) {
-      console.error(e)
-      alert('Error updating weights')
-    } finally {
-      loading.value = false
-    }
-}
-
-// Generate Midterm removed per user request
-
-async function addManualColumn() {
-  const cid = resolvedClassId()
-  if (!cid) return alert('Invalid class')
-  if (!newColLabel.value || !newColTerm.value) return alert('Provide label and term')
-  loading.value = true
+// Save gradebook data
+async function saveGradebook() {
+  const payload = {
+    midtermPercentage: midtermPercentage.value,
+    finalsPercentage: finalsPercentage.value,
+    midtermTables: midtermTables.value,
+    finalsTables: finalsTables.value,
+    grades: grades.value
+  }
+  
   try {
-    const res = await fetch(`${API_BASE}/api/classes/${cid}/gradebook/add-task-column`, {
+    const response = await fetch(`/api/classes/${courseId.value}/gradebook`, {
       method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json', 'x-user-id': localStorage.getItem('loggedInUserId') || '' },
-      body: JSON.stringify({ taskName: newColLabel.value, maxPoints: newColMax.value || null, termType: newColTerm.value })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
     })
-    if (res.ok) {
-      alert('Column added')
-      showAddColumn.value = false
+    
+    if (response.ok) {
+      alert('Gradebook saved successfully!')
     } else {
-      let b = ''
-      try { b = await res.json() } catch(_) { b = await res.text().catch(()=>'') }
-      alert('Failed to add column: ' + (b && b.message ? b.message : res.status))
+      alert('Error saving gradebook')
     }
-  } catch (e) {
-    console.error(e)
-    alert('Error adding column')
-  } finally { loading.value = false }
-}
-
-function openSettings() {
-  weightsJson.value = JSON.stringify({ midterm: midtermWeightInput.value, final: finalWeightInput.value })
-  showSettings.value = true
-}
-
-async function saveSettings() {
-  // Try parse weightsJson first, fallback to inputs
-  let payload = null
-  try { payload = JSON.parse(weightsJson.value) } catch(e) { payload = { midterm: midtermWeightInput.value, final: finalWeightInput.value } }
-  if (Number(payload.midterm) + Number(payload.final) !== 100) return alert('Weights must sum to 100')
-  loading.value = true
-  try {
-    const cid = resolvedClassId()
-    const res = await fetch(`${API_BASE}/api/classes/${cid}/gradebook/update-weights`, {
-      method: 'PUT',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json', 'x-user-id': localStorage.getItem('loggedInUserId') || '' },
-      body: JSON.stringify({ midtermWeight: Number(payload.midterm), finalWeight: Number(payload.final) })
-    })
-    if (res.ok) {
-      midtermWeight.value = Number(payload.midterm)
-      finalWeight.value = Number(payload.final)
-      midtermWeightInput.value = Number(payload.midterm)
-      finalWeightInput.value = Number(payload.final)
-      showSettings.value = false
-      alert('Settings saved')
-    } else {
-      let b = ''
-      try { b = await res.json() } catch(_) { b = await res.text().catch(()=>'') }
-      alert('Failed to save settings: ' + (b && b.message ? b.message : res.status))
-    }
-  } catch (e) {
-    console.error(e)
-    alert('Error saving settings')
-  } finally { loading.value = false }
-}
-
-// Open or generate the literal Midterm Excel file and download it
-function goToCategoryGrading() {
-  const cid = resolvedClassId();
-  if (!cid) return;
-  router.push({ name: 'category-grading', params: { id: cid } });
-}
-
-async function viewMidtermExcel() {
-  const cid = resolvedClassId();
-  if (!cid) return;
-  loading.value = true;
-  try {
-    // Ensure a midterm Excel exists (server will return existing info if already present)
-    try {
-      await fetch(`${API_BASE}/api/classes/${cid}/gradebook/generate-midterm`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'x-user-id': localStorage.getItem('loggedInUserId') || '' }
-      });
-    } catch (e) {
-      // Non-fatal: generation may fail due to migration/auth; we'll still attempt download below
-      console.warn('generate-midterm request failed (non-fatal):', e);
-    }
-
-    // Attempt to download the midterm Excel
-    const dlRes = await fetch(`${API_BASE}/api/classes/${cid}/gradebook/midterm/download`, {
-      credentials: 'include',
-      headers: { 'x-user-id': localStorage.getItem('loggedInUserId') || '' }
-    });
-
-    if (dlRes.ok) {
-      const blob = await dlRes.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `midterm_${cid}.xlsx`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    } else {
-      let msg = '';
-      try { msg = await dlRes.json(); } catch(_) { msg = await dlRes.text().catch(()=>''); }
-      alert(`Failed to download midterm Excel: ${dlRes.status} ${msg && msg.message ? msg.message : msg}`);
-    }
-  } catch (e) {
-    console.error('viewMidtermExcel error:', e);
-    alert('Error opening midterm Excel');
-  } finally {
-    loading.value = false;
+  } catch (error) {
+    console.error('Error saving gradebook:', error)
+    alert('Error saving gradebook')
   }
 }
 
-async function markMidtermComplete() {
-  loading.value = true
-    try {
-      const res = await fetch(`${API_BASE}/api/classes/${props.classId}/gradebook/mark-midterm-complete`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'x-user-id': localStorage.getItem('loggedInUserId') || '' }
-      })
-      if (res.ok) {
-        alert('Midterm marked complete')
-        loadGradebook()
-      } else {
-        let body = ''
-        try { body = await res.json() } catch(_) { body = await res.text().catch(()=>'') }
-        alert('Failed to mark complete: ' + (body && body.message ? body.message : res.status))
-      }
-    } catch (e) {
-      console.error(e)
-      alert('Error marking complete')
-    } finally {
-      loading.value = false
-    }
-}
-
-function viewFinal() {
-  if (finalData.value) {
-    window.open(finalData.value.url, '_blank')
-  }
-}
-
-async function markFinalComplete() {
-  loading.value = true
-    try {
-      const res = await fetch(`${API_BASE}/api/classes/${props.classId}/gradebook/mark-final-complete`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'x-user-id': localStorage.getItem('loggedInUserId') || '' }
-      })
-      if (res.ok) {
-        alert('Final marked complete')
-        loadGradebook()
-      } else {
-        let body = ''
-        try { body = await res.json() } catch(_) { body = await res.text().catch(()=>'') }
-        alert('Failed to mark final complete: ' + (body && body.message ? body.message : res.status))
-      }
-    } catch (e) {
-      console.error(e)
-      alert('Error marking complete')
-    } finally {
-      loading.value = false
-    }
-}
-
-async function downloadGradesheet() {
-  loading.value = true
-    try {
-      const res = await fetch(`${API_BASE}/api/classes/${props.classId}/gradebook/download-gradesheet`, {
-        credentials: 'include',
-        headers: { 'x-user-id': localStorage.getItem('loggedInUserId') || '' }
-      })
-      if (res.ok) {
-        const blob = await res.blob()
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = 'gradesheet.xlsx'
-        a.click()
-        URL.revokeObjectURL(url)
-      } else {
-        let body = ''
-        try { body = await res.json() } catch(_) { body = await res.text().catch(()=>'') }
-        alert('Failed to download gradesheet: ' + (body && body.message ? body.message : res.status))
-      }
-    } catch (e) {
-      console.error(e)
-      alert('Error downloading gradesheet')
-    } finally {
-      loading.value = false
-    }
-}
-
-onMounted(() => {
-  loadGradebook()
+// Initialize
+onMounted(async () => {
+  await loadStudents()
+  await loadGradebook()
+  await loadClasswork()
 })
 
-// Commit preview: accept all changes
-async function commitUploadPreview() {
-  if (!uploadPreview.value || !uploadPreview.value.token) return;
-  loading.value = true;
-  try {
-    const cid = resolvedClassId();
-    // Build accepts payload from checked items
-    const accepts = [];
-    for (const entry of uploadPreview.value.preview || []) {
-      const accepted = (entry.changes || []).filter(ch => ch.__accepted).map(ch => ({ columnKey: ch.columnKey, field: ch.field }));
-      if (accepted.length) accepts.push({ studentId: entry.studentId, accepts: accepted.map(a => ({ columnKey: a.columnKey })) });
-    }
-    // If nothing checked, confirm accept-all
-    let payloadAccepts = accepts;
-    if (accepts.length === 0) {
-      if (!confirm('No changes selected. Apply all changes?')) return;
-      payloadAccepts = [];
-    }
-
-    const res = await fetch(`${API_BASE}/api/classes/${cid}/gradebook/upload/commit`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json', 'x-user-id': localStorage.getItem('loggedInUserId') || '' },
-      body: JSON.stringify({ token: uploadPreview.value.token, accepts: payloadAccepts })
-    });
-    if (!res.ok) {
-      let b = '';
-      try { b = await res.json(); } catch(_) { b = await res.text().catch(()=>'') }
-      return alert('Commit failed: ' + (b && b.message ? b.message : res.status));
-    }
-    alert('Import applied successfully.');
-    showUploadPreview.value = false;
-    uploadPreview.value = null;
-    loadGradebook();
-  } catch (e) {
-    console.error('Commit error', e);
-    alert('Commit failed');
-  } finally { loading.value = false }
-}
+// Watch for classwork changes (optional: implement real-time updates)
+watch(() => route.query.refresh, () => {
+  loadClasswork()
+})
 </script>
 
 <style scoped>
-/* Centered Gradebook Layout */
 .gradebook-container {
-  min-height: 100vh;
-  background: #f8f9fa;
-  padding: 2rem 0;
-}
-
-.content-centered {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 0 1rem;
-}
-
-.card {
-  border: none;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  border-radius: 12px;
-  transition: transform 0.2s, box-shadow 0.2s;
-}
-
-.card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-}
-
-.card h5 {
-  font-weight: 600;
-  color: #2c3e50;
-}
-
-.card h6 {
-  font-weight: 600;
-  color: #2c3e50;
-  font-size: 1.1rem;
-}
-
-/* Button improvements */
-.btn {
-  border-radius: 8px;
-  font-weight: 500;
-  transition: all 0.2s;
-}
-
-.btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-}
-
-/* Table improvements */
-.table {
-  margin-bottom: 0;
-}
-
-.table thead th {
-  font-weight: 600;
-  text-transform: uppercase;
-  font-size: 0.85rem;
-  letter-spacing: 0.5px;
-  color: #495057;
-  border-bottom: 2px solid #dee2e6;
-}
-
-.table tbody tr {
-  transition: background-color 0.15s;
-}
-
-.table tbody tr:hover {
-  background-color: rgba(13, 110, 253, 0.05);
-}
-
-/* Badge styling */
-.badge {
-  padding: 0.4em 0.8em;
-  font-weight: 500;
-  border-radius: 6px;
-}
-
-/* Input group styling */
-.input-group {
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.input-group .form-control {
-  font-weight: 600;
-  font-size: 1.1rem;
-}
-
-/* Modern Modal Styles */
-.modal-backdrop-custom {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
   padding: 1rem;
-  z-index: 1050;
-  animation: fadeIn 0.2s ease-out;
 }
 
-.modal-dialog-custom {
-  width: 100%;
-  max-width: 1400px;
-  max-height: 95vh;
-  margin: 0;
-  animation: slideUp 0.3s ease-out;
-}
-
-.modal-content-custom {
-  background: white;
+/* Period Cards */
+.period-card {
+  padding: 2rem;
   border-radius: 12px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  display: flex;
-  flex-direction: column;
-  max-height: 95vh;
-  overflow: hidden;
-}
-
-.modal-header-custom {
-  padding: 1.5rem 2rem;
-  border-bottom: 1px solid #e5e7eb;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
-  flex-shrink: 0;
-}
-
-.modal-header-custom h5 {
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: #1f2937;
-}
-
-.btn-close-custom {
-  background: transparent;
-  border: none;
-  padding: 0.5rem;
+  text-align: center;
   cursor: pointer;
-  color: #6b7280;
-  font-size: 1.25rem;
-  transition: all 0.2s;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
+  transition: all 0.3s ease;
+  border: 3px solid transparent;
+  background: white;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
-.btn-close-custom:hover {
-  background: #f3f4f6;
-  color: #1f2937;
+.period-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
 }
 
-.modal-body-custom {
-  padding: 0;
-  overflow-y: auto;
-  flex: 1;
-  min-height: 0;
+.period-card.active {
+  border-color: #0d6efd;
+  box-shadow: 0 4px 20px rgba(13,110,253,0.3);
 }
 
-.modal-footer-custom {
-  padding: 1rem 2rem;
-  border-top: 1px solid #e5e7eb;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.75rem;
-  background: #f9fafb;
-  flex-shrink: 0;
+.midterm-card.active {
+  border-color: #28a745;
 }
 
-/* Animations */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+.finals-card.active {
+  border-color: #007bff;
 }
 
-@keyframes slideUp {
-  from {
-    transform: translateY(20px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
+.period-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.period-card h4 {
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+.period-card p {
+  color: #6c757d;
+  font-size: 0.9rem;
+}
+
+/* Table Controls */
+.table-header-controls {
+  background: #f8f9fa;
+  padding: 1rem;
+  border-radius: 8px 8px 0 0;
+  border: 1px solid #dee2e6;
+  border-bottom: none;
+}
+
+.table-name-input {
+  max-width: 250px;
+  font-weight: 600;
+}
+
+/* Gradebook Table */
+.gradebook-table-wrapper {
+  border-radius: 0 0 8px 8px;
+  overflow-x: auto;
+}
+
+.gradebook-table {
+  margin-bottom: 0;
+  font-size: 0.9rem;
+}
+
+.gradebook-table th,
+.gradebook-table td {
+  vertical-align: middle;
+  padding: 0.5rem;
+}
+
+.student-name-column {
+  min-width: 180px;
+  font-weight: 600;
+  position: sticky;
+  left: 0;
+  background: white;
+  z-index: 10;
+}
+
+.main-column-header {
+  background: #e7f3ff;
+  min-width: 150px;
+}
+
+.subcolumn-header {
+  background: #f0f0f0;
+  min-width: 120px;
+  font-size: 0.85rem;
+}
+
+.total-column {
+  background: #fff3cd;
+  font-weight: 600;
+  min-width: 120px;
+  text-align: center;
+}
+
+.column-name-input,
+.subcolumn-name-input {
+  border: 1px dashed #6c757d;
+  background: transparent;
+  font-weight: 600;
+}
+
+.grade-cell {
+  padding: 0.25rem !important;
+}
+
+.grade-input {
+  text-align: center;
+  font-size: 0.85rem;
+  padding: 0.25rem;
+}
+
+.auto-generated-label {
+  font-size: 0.85rem;
+  font-style: italic;
+  color: #6c757d;
+}
+
+/* Computation Summary */
+.computation-summary {
+  background: #f8f9fa;
+  padding: 1.5rem;
+  border-radius: 8px;
+}
+
+.computation-summary .table {
+  background: white;
+}
+
+.computation-summary th {
+  font-weight: 600;
 }
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
-  .modal-dialog-custom {
-    max-width: 100%;
-    max-height: 100vh;
-    padding: 0;
+  .period-card {
+    padding: 1.5rem;
   }
   
-  .modal-content-custom {
-    border-radius: 0;
-    max-height: 100vh;
+  .period-icon {
+    font-size: 2rem;
   }
   
-  .modal-header-custom,
-  .modal-footer-custom {
-    padding: 1rem 1.25rem;
+  .gradebook-table {
+    font-size: 0.8rem;
   }
   
-  .modal-header-custom h5 {
-    font-size: 1.1rem;
+  .student-name-column {
+    min-width: 150px;
   }
-}
-
-/* Scrollbar styling for modal body */
-.modal-body-custom::-webkit-scrollbar {
-  width: 8px;
-}
-
-.modal-body-custom::-webkit-scrollbar-track {
-  background: #f1f1f1;
-}
-
-.modal-body-custom::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 4px;
-}
-
-.modal-body-custom::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
 }
 </style>

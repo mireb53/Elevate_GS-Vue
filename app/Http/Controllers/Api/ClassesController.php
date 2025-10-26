@@ -297,6 +297,77 @@ class ClassesController extends Controller
         ]);
     }
 
+    // GET /api/classes/{id}/gradebook - get gradebook structure and data
+    public function getGradebook(Request $request, $id)
+    {
+        // Check if gradebook_config table exists
+        if (!DB::getSchemaBuilder()->hasTable('gradebook_config')) {
+            return response()->json(['gradebook' => null]);
+        }
+
+        $config = DB::table('gradebook_config')->where('class_id', $id)->first();
+        
+        if (!$config) {
+            return response()->json(['gradebook' => null]);
+        }
+
+        // Decode the JSON structure
+        $gradebook = [
+            'midtermPercentage' => $config->midterm_percentage ?? 50,
+            'finalsPercentage' => $config->finals_percentage ?? 50,
+            'midtermTables' => json_decode($config->midterm_tables ?? '[]', true),
+            'finalsTables' => json_decode($config->finals_tables ?? '[]', true),
+            'grades' => json_decode($config->grades ?? '{}', true),
+        ];
+
+        return response()->json(['gradebook' => $gradebook]);
+    }
+
+    // POST /api/classes/{id}/gradebook - save gradebook structure and data
+    public function saveGradebook(Request $request, $id)
+    {
+        // Ensure gradebook_config table exists
+        if (!DB::getSchemaBuilder()->hasTable('gradebook_config')) {
+            // Create the table if it doesn't exist
+            DB::statement('
+                CREATE TABLE IF NOT EXISTS gradebook_config (
+                    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                    class_id BIGINT UNSIGNED NOT NULL,
+                    midterm_percentage INT DEFAULT 50,
+                    finals_percentage INT DEFAULT 50,
+                    midterm_tables LONGTEXT,
+                    finals_tables LONGTEXT,
+                    grades LONGTEXT,
+                    created_at TIMESTAMP NULL,
+                    updated_at TIMESTAMP NULL,
+                    UNIQUE KEY unique_class (class_id)
+                )
+            ');
+        }
+
+        $data = [
+            'class_id' => $id,
+            'midterm_percentage' => $request->input('midtermPercentage', 50),
+            'finals_percentage' => $request->input('finalsPercentage', 50),
+            'midterm_tables' => json_encode($request->input('midtermTables', [])),
+            'finals_tables' => json_encode($request->input('finalsTables', [])),
+            'grades' => json_encode($request->input('grades', [])),
+            'updated_at' => now(),
+        ];
+
+        // Check if record exists
+        $exists = DB::table('gradebook_config')->where('class_id', $id)->exists();
+
+        if ($exists) {
+            DB::table('gradebook_config')->where('class_id', $id)->update($data);
+        } else {
+            $data['created_at'] = now();
+            DB::table('gradebook_config')->insert($data);
+        }
+
+        return response()->json(['message' => 'Gradebook saved successfully']);
+    }
+
     // GET /api/classes/{id}/grades/summary — minimal student summary
     public function gradeSummary(Request $request, $id)
     {
