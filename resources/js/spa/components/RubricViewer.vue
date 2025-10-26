@@ -17,8 +17,8 @@
             </thead>
             <tbody>
               <tr v-for="(row, idx) in rows" :key="idx">
-                <td>{{ row.criterion || row.name || row.title || `Criterion ${idx+1}` }}</td>
-                <td class="text-center">{{ row.points != null ? row.points : row.max != null ? row.max : row.weight != null ? row.weight : '—' }}</td>
+                <td>{{ row.criterion || row.criterion_name || row.name || row.title || `Criterion ${idx+1}` }}</td>
+                <td class="text-center">{{ row.points != null ? row.points : row.max_points != null ? row.max_points : row.max != null ? row.max : row.weight != null ? row.weight : '—' }}</td>
                 <td>{{ row.description || row.desc || '' }}</td>
               </tr>
               <tr v-if="rows.length === 0">

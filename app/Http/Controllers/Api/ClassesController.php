@@ -452,14 +452,38 @@ class ClassesController extends Controller
             'updated_at' => now(),
         ];
         $id = DB::table('classwork')->insertGetId($payload);
-        // Attachments: for now, store filenames into extra_json.materialFiles if present
+        // Attachments: move files to public/uploads and store metadata; MERGE with existing extra_json (e.g., quiz)
         $files = $request->file('attachments');
         if ($files) {
-            $names = [];
+            $filesMeta = [];
             foreach ((array)$files as $f) {
-                try { $names[] = ['name' => $f->getClientOriginalName(), 'url' => '']; } catch (\Throwable $e) { /* ignore */ }
+                try {
+                    $uploadDir = public_path('uploads');
+                    if (!is_dir($uploadDir)) @mkdir($uploadDir, 0775, true);
+                    $stored = $f->hashName();
+                    $f->move($uploadDir, $stored);
+                    $filesMeta[] = [
+                        'originalName' => $f->getClientOriginalName(),
+                        'storedName' => $stored,
+                        'url' => '/uploads/' . $stored,
+                    ];
+                } catch (\Throwable $e) {
+                    try {
+                        $filesMeta[] = [
+                            'originalName' => method_exists($f, 'getClientOriginalName') ? $f->getClientOriginalName() : 'file',
+                            'storedName' => method_exists($f, 'hashName') ? $f->hashName() : null,
+                            'url' => '',
+                        ];
+                    } catch (\Throwable $e2) { /* ignore */ }
+                }
             }
-            DB::table('classwork')->where('id',$id)->update(['extra_json' => json_encode(['materialFiles'=>$names])]);
+            // Merge with existing extra_json (e.g., quiz)
+            $existingExtra = [];
+            try {
+                if ($payload['extra_json']) { $existingExtra = json_decode($payload['extra_json'], true) ?: []; }
+            } catch (\Throwable $e) { $existingExtra = []; }
+            $existingExtra['materialFiles'] = array_merge($existingExtra['materialFiles'] ?? [], $filesMeta);
+            DB::table('classwork')->where('id',$id)->update(['extra_json' => json_encode($existingExtra)]);
         }
         return response()->json(['id' => $id] + $payload, 201);
     }
@@ -482,16 +506,48 @@ class ClassesController extends Controller
         if (!DB::getSchemaBuilder()->hasTable('classwork_submissions')) {
             return response()->json([]);
         }
-        $rows = DB::table('classwork_submissions')->where('classwork_id',$id)->orderBy('created_at','desc')->get();
+        // Build query with schema-aware ordering
+        $query = DB::table('classwork_submissions')->where('classwork_id', $id);
+        try {
+            $hasSubmittedAt = \Illuminate\Support\Facades\Schema::hasColumn('classwork_submissions', 'submitted_at');
+            $hasCreatedAt = \Illuminate\Support\Facades\Schema::hasColumn('classwork_submissions', 'created_at');
+            if ($hasSubmittedAt) {
+                $query = $query->orderBy('submitted_at', 'desc');
+            } else if ($hasCreatedAt) {
+                $query = $query->orderBy('created_at', 'desc');
+            }
+        } catch (\Throwable $e) { /* ignore ordering if schema introspection fails */ }
+        $rows = $query->get();
         // normalize
         $out = [];
         foreach ($rows as $r) {
+            // decode files JSON or fallback to extra_json->files
+            $files = [];
+            try {
+                if (isset($r->files_json) && $r->files_json) {
+                    $files = json_decode($r->files_json, true) ?: [];
+                } else if (isset($r->extra_json) && $r->extra_json) {
+                    $extra = json_decode($r->extra_json, true) ?: [];
+                    if (isset($extra['files']) && is_array($extra['files'])) {
+                        $files = $extra['files'];
+                    }
+                }
+            } catch (\Throwable $e) { $files = []; }
+
+            // decode grade when present
+            $grade = null;
+            try {
+                if (isset($r->grade_json) && $r->grade_json) {
+                    $grade = json_decode($r->grade_json, true) ?: null;
+                }
+            } catch (\Throwable $e) { $grade = null; }
+
             $out[] = [
                 'id' => $r->id,
                 'userId' => $r->user_id,
-                'submittedAt' => $r->submitted_at ?? $r->created_at,
-                'files' => $r->files_json ? json_decode($r->files_json, true) : [],
-                'grade' => $r->grade_json ? json_decode($r->grade_json, true) : null,
+                'submittedAt' => $r->submitted_at ?? ($r->created_at ?? null),
+                'files' => $files,
+                'grade' => $grade,
             ];
         }
         return response()->json($out);
@@ -578,7 +634,28 @@ class ClassesController extends Controller
         $files = $request->file('attachments');
         if ($files) {
             foreach ((array)$files as $f) {
-                try { $filesMeta[] = ['originalName'=>$f->getClientOriginalName(), 'storedName'=>$f->hashName(), 'url'=>'']; } catch (\Throwable $e) { /* ignore */ }
+                try {
+                    // Ensure uploads directory exists
+                    $uploadDir = public_path('uploads');
+                    if (!is_dir($uploadDir)) @mkdir($uploadDir, 0775, true);
+                    // Generate unique stored name and move file
+                    $stored = $f->hashName();
+                    $f->move($uploadDir, $stored);
+                    $filesMeta[] = [
+                        'originalName' => $f->getClientOriginalName(),
+                        'storedName' => $stored,
+                        'url' => '/uploads/' . $stored,
+                    ];
+                } catch (\Throwable $e) {
+                    // On failure, try minimal metadata without moving
+                    try {
+                        $filesMeta[] = [
+                            'originalName' => method_exists($f, 'getClientOriginalName') ? $f->getClientOriginalName() : 'file',
+                            'storedName' => method_exists($f, 'hashName') ? $f->hashName() : null,
+                            'url' => '',
+                        ];
+                    } catch (\Throwable $e2) { /* ignore */ }
+                }
             }
         }
         $answers = null;
@@ -586,16 +663,51 @@ class ClassesController extends Controller
             $raw = $request->input('answers');
             $answers = is_string($raw) ? json_decode($raw, true) : $raw;
         }
+        // Build payload resiliently to different schema variants
         $payload = [
             'classwork_id' => (int)$id,
             'user_id' => $userId,
-            'submitted_at' => now(),
-            'files_json' => $filesMeta ? json_encode($filesMeta) : null,
-            'grade_json' => null,
-            'answers_json' => $answers ? json_encode($answers) : null,
-            'created_at' => now(),
-            'updated_at' => now(),
         ];
+        try {
+            $schema = DB::getSchemaBuilder();
+            $hasFiles = \Illuminate\Support\Facades\Schema::hasColumn('classwork_submissions', 'files_json');
+            $hasAnswers = \Illuminate\Support\Facades\Schema::hasColumn('classwork_submissions', 'answers_json');
+            $hasExtra = \Illuminate\Support\Facades\Schema::hasColumn('classwork_submissions', 'extra_json');
+            $hasGrade = \Illuminate\Support\Facades\Schema::hasColumn('classwork_submissions', 'grade_json');
+            $hasSubmittedAt = \Illuminate\Support\Facades\Schema::hasColumn('classwork_submissions', 'submitted_at');
+            $hasCreatedAt = \Illuminate\Support\Facades\Schema::hasColumn('classwork_submissions', 'created_at');
+            $hasUpdatedAt = \Illuminate\Support\Facades\Schema::hasColumn('classwork_submissions', 'updated_at');
+
+            if ($hasSubmittedAt) {
+                $payload['submitted_at'] = now();
+            }
+            if ($hasGrade) {
+                $payload['grade_json'] = null;
+            }
+            if ($hasCreatedAt) {
+                $payload['created_at'] = now();
+            }
+            if ($hasUpdatedAt) {
+                $payload['updated_at'] = now();
+            }
+
+            if ($hasFiles) {
+                $payload['files_json'] = $filesMeta ? json_encode($filesMeta) : null;
+            } else if ($hasExtra && $filesMeta) {
+                // Fallback: store files under extra_json when files_json doesn't exist
+                $payload['extra_json'] = json_encode(['files' => $filesMeta]);
+            }
+            if ($hasAnswers) {
+                $payload['answers_json'] = $answers ? json_encode($answers) : null;
+            } else if ($hasExtra && $answers) {
+                // Merge into extra_json while preserving any files payload
+                $existingExtra = isset($payload['extra_json']) ? json_decode($payload['extra_json'], true) : [];
+                $existingExtra['answers'] = $answers;
+                $payload['extra_json'] = json_encode($existingExtra);
+            }
+        } catch (\Throwable $e) {
+            // If schema inspection fails, keep minimal payload; DB may ignore unknown columns
+        }
         // Upsert: if a submission already exists, update it
         $existing = DB::table('classwork_submissions')->where(['classwork_id'=>$id,'user_id'=>$userId])->first();
         if ($existing) {

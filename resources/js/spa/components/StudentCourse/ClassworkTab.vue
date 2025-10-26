@@ -258,7 +258,18 @@ async function handleSubmission(classworkId){
     const userId = localStorage.getItem('loggedInUserId') || sessionStorage.getItem('userId')
     const headers = userId ? { 'x-user-id': userId } : {}
     const res = await fetch(`${BACKEND}/api/classwork/${classworkId}/submit`, { method:'POST', body: fd, headers })
-    if(!res.ok){ const err = await res.json().catch(()=>({})); throw new Error(err.message || 'Submission failed') }
+    if(!res.ok){ 
+      let msg = 'Submission failed'
+      try {
+        const ct = res.headers.get('content-type') || ''
+        if (ct.includes('application/json')) {
+          const err = await res.json(); msg = err.message || msg
+        } else {
+          const txt = await res.text(); msg = (txt && txt.trim().slice(0,200)) || msg
+        }
+      } catch(_) {}
+      throw new Error(msg)
+    }
     alert('Work submitted successfully!')
     await openDetail(classworkId)
   }catch(e){ console.error('Submission error', e); alert('Error: '+e.message) }
@@ -518,6 +529,7 @@ const detailDescription = computed(()=>{
   line-height: 1.4;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -529,6 +541,7 @@ const detailDescription = computed(()=>{
   line-height: 1.6;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }

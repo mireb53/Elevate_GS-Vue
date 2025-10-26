@@ -57,7 +57,7 @@
               <div class="person-info">
                 <h3 class="person-name">{{ insDisplayName(ins) }}</h3>
                 <p class="person-email">{{ ins.email || '' }}</p>
-                <span :class="['role-badge', getRoleBadgeClass(ins.role_in_class)]">
+                <span v-if="showRoleBadge(ins.role_in_class)" :class="['role-badge', getRoleBadgeClass(ins.role_in_class)]">
                   <i :class="getRoleIcon(ins.role_in_class)" class="me-1"></i>
                   {{ getRoleLabel(ins.role_in_class) }}
                 </span>
@@ -162,8 +162,10 @@ async function loadPeopleForClass(id){
     const res = await fetch(`${BACKEND}/api/classes/${id}/people`, { headers, credentials: 'include' })
     if(!res.ok) throw new Error('Failed to load people')
     const data = await res.json()
-    instructors.value = data.instructors || []
+  instructors.value = (data.instructors || []).filter(i => (i.role_in_class || '').toLowerCase() === 'owner')
     students.value = data.students || []
+    // debug: log instructors shape to verify the patched component is loaded
+    try{ console.log('[StudentPeopleTab] instructors loaded', instructors.value.map(i=>({ id:i.id, email:i.email, role: i.role_in_class || null }))) }catch(e){}
     // normalize avatars if any
     instructors.value.forEach(i=>{ i.avatarUrl = resolveAvatarUrl(i) })
     students.value.forEach(s=>{ s.avatarUrl = resolveAvatarUrl(s) })
@@ -254,8 +256,12 @@ function getRoleIcon(role) {
 
 // Helper: Get role label
 function getRoleLabel(role) {
-  if (!role) return 'Member';
-  return role.toUpperCase();
+  if (!role) return '';
+  return String(role).toUpperCase();
+}
+
+function showRoleBadge(role) {
+  return !!(role && String(role).trim());
 }
 
 onMounted(()=>{ if(currentId.value) loadPeopleForClass(currentId.value) })

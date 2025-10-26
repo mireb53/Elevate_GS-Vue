@@ -270,7 +270,16 @@ onMounted(async () => {
         return true;
       });
     };
-    instructors.value = uniq(props.course.instructors || props.course.teachers || []);
+    const rawIns = props.course.instructors || props.course.teachers || [];
+    const currentUserId = String(localStorage.getItem('loggedInUserId')||'');
+    instructors.value = uniq((rawIns || []).map(p => {
+      const clone = { ...p };
+      // If this is the current teacher and role is missing, mark as owner
+      if ((!clone.role_in_class || String(clone.role_in_class).trim()==='') && String(clone.id||'') === currentUserId) {
+        clone.role_in_class = 'owner';
+      }
+      return clone;
+    }));
     students.value = uniq(props.course.students || []);
     loading.value = false;
     return;
@@ -307,7 +316,14 @@ async function loadPeople() {
           return true;
         });
       };
-      instructors.value = uniq(data.instructors || []);
+      const currentUserId = String(localStorage.getItem('loggedInUserId')||'');
+      instructors.value = uniq((data.instructors || []).map(p => {
+        const clone = { ...p };
+        if ((!clone.role_in_class || String(clone.role_in_class).trim()==='') && String(clone.id||'') === currentUserId) {
+          clone.role_in_class = 'owner';
+        }
+        return clone;
+      }));
       students.value = uniq(data.students || []);
     } else {
       error.value = `Failed to fetch people (status ${res.status})`;

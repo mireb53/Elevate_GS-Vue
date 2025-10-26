@@ -735,8 +735,18 @@ async function handleSubmission(classworkId){
   const res = await fetch(`${(API_BASE || '')}/api/classwork/${classworkId}/submit`, { method:'POST', body: fd, headers })
     
     if(!res.ok){ 
-      const err = await res.json().catch(()=>({}))
-      throw new Error(err.message || 'Submission failed') 
+      let msg = 'Submission failed'
+      try {
+        const ct = res.headers.get('content-type') || ''
+        if (ct.includes('application/json')) {
+          const err = await res.json()
+          msg = err.message || msg
+        } else {
+          const txt = await res.text()
+          msg = (txt && txt.trim().slice(0,200)) || msg
+        }
+      } catch(_) {}
+      throw new Error(msg)
     }
     
     // Show success message for quiz

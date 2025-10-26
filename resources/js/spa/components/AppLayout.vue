@@ -68,7 +68,7 @@
     </div>
     <!-- Provide modal containers migrated from legacy fragments -->
   <ClassModals />
-  <div v-if="!isAdminRoute" id="sidebarOverlay" :class="['overlay', { show: sidebarVisible }]" @click="closeSidebar"></div>
+  <div v-if="!isAdminRoute" id="sidebarOverlay" :class="['overlay', { show: sidebarVisible }]" ></div>
     <div class="layout">
       <nav id="sidebar" v-if="!isAdminRoute" :class="['sidebar', { show: sidebarVisible }]">
         <div class="sidebar-content">
@@ -110,13 +110,19 @@
             <div class="section-label">Courses</div>
             <!-- Created Courses (Teachers/Admins Only) -->
             <li class="nav-item" id="myCoursesNavItem">
-              <a class="nav-link d-flex align-items-center" data-bs-toggle="collapse" :href="`#myCoursesCollapse`" aria-expanded="false" :class="{ 'disabled': userRole !== 'teacher' }">
+              <a href="#" class="nav-link d-flex align-items-center" @click.prevent="toggleMyCourses" :class="{ 'disabled': userRole !== 'teacher' }">
                 <i class="bi bi-journal-text me-2"></i>
                 <span class="link-text grow">My Courses</span>
-                <i class="bi bi-caret-down-fill caret shrink-0"></i>
+                <i :class="[ 'caret','shrink-0', myCoursesOpen ? 'bi bi-caret-down-fill' : 'bi bi-caret-right-fill' ]"></i>
               </a>
-              <div class="collapse" :id="`myCoursesCollapse`" v-show="sidebarReady">
-                <ul class="nav flex-column ms-2 mt-1" id="sidebarMyCoursesList">
+              <transition 
+                name="expand"
+                @enter="onExpandEnter" 
+                @after-enter="onExpandAfterEnter" 
+                @leave="onExpandLeave" 
+                @after-leave="onExpandAfterLeave">
+                <div v-if="sidebarReady && myCoursesOpen">
+                  <ul class="nav flex-column ms-2 mt-1" id="sidebarMyCoursesList">
                   <li v-if="userRole !== 'teacher'" class="nav-item">
                     <span class="nav-link text-muted" style="font-size: 0.85rem;">Teacher only</span>
                   </li>
@@ -142,18 +148,25 @@
                     </template>
                   </li>
                 </ul>
-              </div>
+                </div>
+              </transition>
             </li>
 
             <!-- Joined Courses -->
             <li class="nav-item">
-              <a class="nav-link d-flex align-items-center" data-bs-toggle="collapse" :href="`#joinedCoursesCollapse`" aria-expanded="false">
+              <a href="#" class="nav-link d-flex align-items-center" @click.prevent="toggleJoinedCourses">
                 <i class="bi bi-journal-bookmark-fill me-2"></i>
                 <span class="link-text grow">Joined Courses</span>
-                <i class="bi bi-caret-down-fill caret shrink-0"></i>
+                <i :class="[ 'caret','shrink-0', joinedCoursesOpen ? 'bi bi-caret-down-fill' : 'bi bi-caret-right-fill' ]"></i>
               </a>
-              <div class="collapse" :id="`joinedCoursesCollapse`" v-show="sidebarReady">
-                <ul class="nav flex-column ms-2 mt-1" id="sidebarJoinedCoursesList">
+              <transition 
+                name="expand"
+                @enter="onExpandEnter" 
+                @after-enter="onExpandAfterEnter" 
+                @leave="onExpandLeave" 
+                @after-leave="onExpandAfterLeave">
+                <div v-if="sidebarReady && joinedCoursesOpen">
+                  <ul class="nav flex-column ms-2 mt-1" id="sidebarJoinedCoursesList">
                   <li v-if="displayedJoinedCourses.length === 0" class="nav-item">
                     <span class="nav-link text-muted">No joined courses.</span>
                   </li>
@@ -176,7 +189,8 @@
                     </template>
                   </li>
                 </ul>
-              </div>
+                </div>
+              </transition>
             </li>
           </ul>
         </div>
@@ -204,6 +218,8 @@ import { API_BASE } from '../services/apiBase'
 
 const sidebarVisible = ref(false)
 const showProfileDropdown = ref(false)
+const myCoursesOpen = ref(false)
+const joinedCoursesOpen = ref(false)
 
 // Add/Join Dropdown modal handlers
 function openCreateClassModal() {
@@ -243,7 +259,7 @@ const userRole = computed(() => localStorage.getItem('loggedInUserRole') || 'stu
 const profilePicture = ref('')
 const createdCourses = ref([])
 const joinedCourses = ref([])
-const sidebarReady = ref(false)
+const sidebarReady = ref(true)
 const displayedCreatedCourses = computed(() => {
   // Teachers see all created; keep pending visible but styled disabled
   if (userRole.value !== 'teacher') return []
@@ -325,6 +341,55 @@ function closeSidebar() {
   sidebarVisible.value = false
 }
 
+function toggleMyCourses(){
+  if (userRole.value !== 'teacher') return
+  myCoursesOpen.value = !myCoursesOpen.value
+}
+
+function toggleJoinedCourses(){
+  joinedCoursesOpen.value = !joinedCoursesOpen.value
+}
+
+// Expand/collapse transition hooks for course sections
+function onExpandEnter(el){
+  try {
+    el.style.height = '0px'
+    el.style.opacity = '0'
+    el.style.overflow = 'hidden'
+    // force reflow
+    void el.offsetHeight
+    const target = el.scrollHeight
+    el.style.transition = 'height 200ms ease, opacity 200ms ease'
+    el.style.height = target + 'px'
+    el.style.opacity = '1'
+  } catch(e) {}
+}
+function onExpandAfterEnter(el){
+  try {
+    el.style.transition = ''
+    el.style.height = 'auto'
+    el.style.overflow = ''
+  } catch(e) {}
+}
+function onExpandLeave(el){
+  try {
+    el.style.height = el.scrollHeight + 'px'
+    el.style.opacity = '1'
+    el.style.overflow = 'hidden'
+    void el.offsetHeight
+    el.style.transition = 'height 200ms ease, opacity 200ms ease'
+    el.style.height = '0px'
+    el.style.opacity = '0'
+  } catch(e) {}
+}
+function onExpandAfterLeave(el){
+  try {
+    el.style.transition = ''
+    el.style.height = ''
+    el.style.overflow = ''
+  } catch(e) {}
+}
+
 function handleAvatarError(e) {
   e.target.outerHTML = `<span class="initials-avatar">${initials.value}</span>`
 }
@@ -381,7 +446,7 @@ async function navigate(path) {
       path,
       replace: false
     })
-    closeSidebar() // Close sidebar after navigation on mobile
+    // Sidebar will stay open until user closes it
   } catch (err) {
     if (err.name === 'NavigationDuplicated') {
       // Ignore duplicate navigation errors
@@ -402,31 +467,11 @@ onMounted(async () => {
   await loadUserProfile()
   await loadCourses()
 
-  // Initialize Bootstrap collapse for course sections and auto-expand if they have content
-  await nextTick(() => {
-    if (window.bootstrap && window.bootstrap.Collapse) {
-      // Initialize collapse elements
-      const myCoursesCollapse = document.getElementById('myCoursesCollapse')
-      const joinedCoursesCollapse = document.getElementById('joinedCoursesCollapse')
-
-      if (myCoursesCollapse) {
-        const myInst = new window.bootstrap.Collapse(myCoursesCollapse, { toggle: false })
-        // Auto-expand if there are created courses
-        if (displayedCreatedCourses.value.length > 0) {
-          myInst.show()
-        }
-      }
-      if (joinedCoursesCollapse) {
-        const joinedInst = new window.bootstrap.Collapse(joinedCoursesCollapse, { toggle: false })
-        // Auto-expand if there are joined courses
-        if (displayedJoinedCourses.value.length > 0) {
-          joinedInst.show()
-        }
-      }
-    }
-    // Mark sidebar ready so UI can render without flashing
-    sidebarReady.value = true
-  })
+  // Set initial open states based on available courses
+  myCoursesOpen.value = userRole.value === 'teacher' && displayedCreatedCourses.value.length > 0
+  joinedCoursesOpen.value = displayedJoinedCourses.value.length > 0
+  // Mark sidebar ready so UI can render without flashing
+  await nextTick(() => { sidebarReady.value = true })
 })
 
 // keep body class in sync so other components can adapt (e.g. suppress tab focus glow)
@@ -453,6 +498,18 @@ if (typeof window !== 'undefined') {
     } catch(e){}
   })
 }
+
+// Keep sections open when new courses arrive
+watch(displayedCreatedCourses, (list) => {
+  if (userRole.value === 'teacher' && list && list.length > 0) {
+    myCoursesOpen.value = true
+  }
+})
+watch(displayedJoinedCourses, (list) => {
+  if (list && list.length > 0) {
+    joinedCoursesOpen.value = true
+  }
+})
 </script>
 
 <style scoped>

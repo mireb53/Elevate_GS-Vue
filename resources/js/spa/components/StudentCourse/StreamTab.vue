@@ -123,6 +123,17 @@
 
           <div class="detail-description" v-html="selected.description"></div>
 
+          <!-- Attachments -->
+          <div v-if="selectedAttachments.length" class="mt-3">
+            <h5 class="mb-2">Attachments</h5>
+            <ul class="list-unstyled">
+              <li v-for="(f, i) in selectedAttachments" :key="i" class="mb-1">
+                <i class="bi bi-paperclip me-2"></i>
+                <a :href="f.url" target="_blank" rel="noopener">{{ f.name }}</a>
+              </li>
+            </ul>
+          </div>
+
           <!-- Rubric Section -->
           <div class="mt-4" v-if="selected.id">
             <RubricViewer :classwork-id="selected.id" />
@@ -134,7 +145,7 @@
 </template>
 
 <script setup>
-import { defineProps, ref, watch, onMounted, onUnmounted } from 'vue'
+import { defineProps, ref, watch, onMounted, onUnmounted, computed } from 'vue'
 import RubricViewer from '@/components/RubricViewer.vue'
 import { API_BASE } from '@/services/apiBase'
 
@@ -187,6 +198,33 @@ async function loadForClass(id){
 
 function openDetail(item){ selected.value = item }
 function closeDetail(){ selected.value = null }
+
+// Build attachments for selected item (from extra_json.materialFiles)
+const selectedAttachments = computed(() => {
+  const BACKEND = API_BASE || ''
+  const s = selected.value
+  if (!s) return []
+  let files = []
+  try {
+    if (Array.isArray(s.materialFiles)) files = s.materialFiles
+    else if (s.extra_json) {
+      const ex = typeof s.extra_json === 'string' ? JSON.parse(s.extra_json) : s.extra_json
+      if (Array.isArray(ex?.materialFiles)) files = ex.materialFiles
+    }
+  } catch(e) { files = [] }
+  return (files || []).map(f => {
+    const name = f.originalName || f.name || f.fileName || f.storedName || 'file'
+    let url = f.url || ''
+    if (url && typeof url === 'string') {
+      if (/^https?:\/\//i.test(url)) return { name, url }
+      if (url.startsWith('/')) return { name, url: (BACKEND.replace(/\/$/, '')) + url }
+      return { name, url: (BACKEND.replace(/\/$/, '')) + '/' + encodeURI(url) }
+    }
+    const stored = f.storedName || f.fileName
+    if (stored) return { name, url: (BACKEND.replace(/\/$/, '')) + '/uploads/' + encodeURIComponent(stored) }
+    return { name, url: '#' }
+  })
+})
 
 // Helper functions for type handling
 function getTypeClass(type) {
